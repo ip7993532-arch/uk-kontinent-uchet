@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>УК Континент — Учёт спецодежды и инвентаря</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2324518f'/%3E%3Cstop offset='1' stop-color='%232A7F77'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Ctext x='32' y='42' font-family='Arial,sans-serif' font-size='26' font-weight='800' fill='white' text-anchor='middle'%3E%D0%A3%D0%9A%3C/text%3E%3C/svg%3E">
 <style>
   :root{
     --ink:#1F2A37; --muted:#667085; --accent:#2F5597; --accent-soft:#EAF1FB;
@@ -68,6 +69,21 @@
   .action-row{display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
   .search{min-width:180px;}
   .flex{display:flex; gap:10px; flex-wrap:wrap;}
+  /* Панель работников слева (сверху вниз) */
+  #side{position:fixed; left:0; top:0; bottom:0; width:236px; background:rgba(255,255,255,.94); border-right:1px solid var(--border); box-shadow:2px 0 12px rgba(31,42,55,.08); overflow-y:auto; padding:16px 12px; z-index:40; backdrop-filter:blur(3px);}
+  #side h3{font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; margin-bottom:10px;}
+  .side-empty{font-size:13px; color:var(--muted); line-height:1.5;}
+  .wcard{display:block; width:100%; text-align:left; background:var(--soft); border:1px solid var(--border); border-left:4px solid var(--accent); border-radius:8px; padding:9px 11px; margin-bottom:8px; cursor:pointer; transition:border-color .15s, background .15s, transform .1s;}
+  .wcard:hover{border-color:var(--accent); background:#fff; transform:translateX(2px);}
+  .wcard.active{background:linear-gradient(135deg,#24518f,#2A7F77); border-left-color:#fff; color:#fff;}
+  .wcard .nm{font-weight:700; font-size:13px;}
+  .wcard .pt{font-size:11px; color:var(--muted); margin-top:2px;}
+  .wcard.active .pt{color:rgba(255,255,255,.85);}
+  .wcard .ct{font-size:11px; font-weight:600; margin-top:4px; display:inline-block; background:var(--accent-soft); color:var(--accent); border-radius:10px; padding:1px 8px;}
+  .wcard.active .ct{background:rgba(255,255,255,.2); color:#fff;}
+  body{padding-left:236px;}
+  .wrap{max-width:1200px; margin:0 auto; padding:20px;}
+  @media(max-width:860px){ #side{display:none;} body{padding-left:0;} }
   /* Обложка на всю страницу */
   #cover{position:fixed; inset:0; z-index:100; background:linear-gradient(135deg,#1c3d6b 0%,#2A7F77 100%); color:#fff; display:flex; align-items:center; justify-content:center; transition:opacity .5s ease; overflow:auto;}
   #cover.hide{opacity:0; pointer-events:none;}
@@ -118,7 +134,10 @@
     <input type="file" id="bk_file" accept=".json,application/json" hidden>
   </div>
   <span class="badge">Главный инженер · автономный режим</span>
+  <span class="badge" id="save_ind" style="transition:opacity .5s; opacity:0">✓ Сохранено</span>
 </header>
+
+<div id="side"><h3>Работники</h3><div class="side-empty">Добавьте работников, чтобы они появились здесь.</div></div>
 
 <div class="wrap">
   <nav class="tabs" id="tabs">
@@ -256,11 +275,47 @@ const addMonths=(iso,m)=>{const d=parse(iso);d.setMonth(d.getMonth()+Number(m));
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 
 let state=load();
+const IDB_NAME="uk_kontinent_uchet", IDB_STORE="state", IDB_KEY="main";
+let idbDb=null;
+function openIDB(){
+  return new Promise(res=>{
+    if(!window.indexedDB){res(null);return;}
+    const req=indexedDB.open(IDB_NAME,1);
+    req.onupgradeneeded=e=>{const d=e.target.result;if(!d.objectStoreNames.contains(IDB_STORE))d.createObjectStore(IDB_STORE);};
+    req.onsuccess=e=>res(e.target.result);
+    req.onerror=()=>res(null);
+  });
+}
+async function idbSave(s){
+  try{
+    idbDb=idbDb||await openIDB(); if(!idbDb||!idbDb.objectStoreNames.contains(IDB_STORE))return;
+    const tx=idbDb.transaction(IDB_STORE,"readwrite"); tx.objectStore(IDB_STORE).put({s,ts:Date.now()},IDB_KEY);
+  }catch(e){}
+}
+async function idbLoad(){
+  try{
+    idbDb=idbDb||await openIDB(); if(!idbDb||!idbDb.objectStoreNames.contains(IDB_STORE))return null;
+    return await new Promise(r=>{const q=idbDb.transaction(IDB_STORE,"readonly").objectStore(IDB_STORE).get(IDB_KEY);q.onsuccess=()=>r(q.result||null);q.onerror=()=>r(null);});
+  }catch(e){return null;}
+}
 function load(){
   try{const raw=localStorage.getItem(LS_KEY);if(raw)return JSON.parse(raw);}catch(e){}
   return {workers:[],items:[],tx:[]};
 }
-function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(state));}catch(e){alert("Не удалось сохранить данные (переполнение хранилища). Экспортируйте резервную копию, чтобы не потерять.");}}
+let lastSaveTs=0;
+function save(){
+  try{localStorage.setItem(LS_KEY,JSON.stringify(state));lastSaveTs=Date.now();}catch(e){console.warn("localStorage full");}
+  idbSave(state);
+  const el=document.getElementById("save_ind"); if(el){el.style.opacity="1";clearTimeout(el._t);el._t=setTimeout(function(){el.style.opacity="0";},1600);}
+}
+async function recoverFromIDB(){
+  const rec=await idbLoad(); if(!rec||!rec.s||!rec.s.workers||!rec.s.items||!rec.s.tx)return;
+  const lsEmpty=!state.workers.length&&!state.items.length&&!state.tx.length;
+  if(lsEmpty){
+    state=rec.s; save();
+    renderDash(); renderWorkers(); renderItems(); renderOps(); renderOpsForm(); renderCards(); renderSide();
+  }
+}
 
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function fmtDate(iso){if(!iso)return"—";const[x,y,z]=iso.split("-");return z+"."+y+"."+x;}
@@ -299,6 +354,34 @@ document.getElementById("tabs").addEventListener("click",e=>{
 });
 
 // ---------- Workers ----------
+function renderSide(){
+  const side=document.getElementById("side"); if(!side)return;
+  const h=holdings();
+  if(!state.workers.length){side.innerHTML='<h3>Работники</h3><div class="side-empty">Добавьте работников, чтобы они появились здесь.</div>';return;}
+  side.innerHTML="<h3>Работники</h3>"+state.workers.map(w=>{
+    const n=Object.keys(h).filter(k=>k.startsWith(w.id+"|")&&onHand(h[k])>0).length;
+    const post=esc(w.post&&w.post!=="—"?w.post:"");
+    return '<button class="wcard" data-sid="'+w.id+'"><div class="nm">'+esc(w.name)+'</div>'+
+      (post?'<div class="pt">'+post+'</div>':'')+
+      (n?'<span class="ct">'+n+' поз. на руках</span>':'<span class="ct" style="background:var(--muted);color:#fff">нет выдач</span>')+
+      '</button>';
+  }).join("");
+  side.querySelectorAll(".wcard").forEach(b=>b.onclick=()=>{
+    const id=b.dataset.sid;
+    // Выделить в форме выдачи и переключиться на неё
+    document.getElementById("op_worker").value=id;
+    document.querySelectorAll("nav#tabs button").forEach(x=>x.classList.toggle("active",x.dataset.tab==="ops"));
+    document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
+    document.getElementById("plops").classList.add("active");
+    document.getElementById("op_kind").value="Выдача";
+    document.querySelectorAll(".wcard").forEach(x=>x.classList.toggle("active",x===b));
+    document.getElementById("op_item").focus();
+  });
+}
+document.getElementById("side").addEventListener("click",e=>{
+  const b=e.target.closest(".wcard"); if(b)return; /* handled per-button */
+});
+
 function renderWorkers(){
   const t=document.getElementById("wtbl");
   if(!state.workers.length){t.innerHTML='<div class="empty">Работников пока нет — добавьте первого.</div>';return;}
@@ -312,7 +395,7 @@ function renderWorkers(){
   t.querySelectorAll("[data-a='wd']").forEach(b=>b.onclick=()=>{
     if(confirm("Удалить работника и все его операции?")){
       const id=b.dataset.id; state.workers=state.workers.filter(w=>w.id!==id);
-      state.tx=state.tx.filter(x=>x.workerId!==id); save(); renderWorkers(); renderOpsForm(); renderCards();
+      state.tx=state.tx.filter(x=>x.workerId!==id); save(); renderWorkers(); renderOps(); renderOpsForm(); renderCards(); renderSide();
     }
   });
   t.querySelectorAll("[data-a='we']").forEach(b=>b.onclick=()=>{
@@ -367,7 +450,7 @@ document.getElementById("w_add").addEventListener("click",()=>{
   }else{
     state.workers.push({id:uid(),name,post:post||"—",dept:dept||"—",tab,sex,hrota,sz_ap,sz_sh,sz_gl,sz_hd,hire});
   }
-  save(); renderWorkers(); renderOpsForm(); renderCards(); closeModal();
+  save(); renderWorkers(); renderOpsForm(); renderCards(); renderSide(); closeModal();
   ["w_name","w_post","w_dept","w_tab","w_hrota","w_sz_ap","w_sz_sh","w_sz_gl","w_sz_hd","w_hire"].forEach(i=>document.getElementById(i).value="");
   document.getElementById("w_sex").value="М";
 });
@@ -410,7 +493,7 @@ document.getElementById("op_add").addEventListener("click",()=>{
     if(onHand(acc)<qty){alert("Нельзя провести: на руках у работника меньше ("+onHand(acc)+" шт.).");return;}
   }
   state.tx.push({id:uid(),workerId,itemId,qty,date,kind});
-  save(); renderOps(); renderOpsForm();
+  save(); renderOps(); renderOpsForm(); renderSide();
   document.getElementById("op_qty").value="1";
 });
 
@@ -425,7 +508,7 @@ function renderOps(){
         '<td><button class="btn sm danger" data-id="'+x.id+'">Уд.</button></td></tr>';
     }).join("")+"</tbody>";
   t.querySelectorAll("button[data-id]").forEach(b=>b.onclick=()=>{
-    state.tx=state.tx.filter(x=>x.id!==b.dataset.id); save(); renderOps();
+    state.tx=state.tx.filter(x=>x.id!==b.dataset.id); save(); renderOps(); renderSide();
   });
 }
 
@@ -665,7 +748,7 @@ function importBackup(file){
       const st=data.state;
       if(!st||!Array.isArray(st.workers)||!Array.isArray(st.items)||!Array.isArray(st.tx))throw new Error("bad");
       state=st; save();
-      renderDash(); renderWorkers(); renderItems(); renderOps(); renderOpsForm(); renderCards();
+renderDash(); renderWorkers(); renderItems(); renderOps(); renderOpsForm(); renderCards(); renderSide();
       alert("Данные успешно восстановлены. Это окно можно закрыть.");
     }catch(e){alert("Некорректный файл резервной копии: данные не изменены.");}
   };
@@ -743,7 +826,8 @@ function closeModal(){document.getElementById("modal").classList.remove("open");
 
 // Init
 loadFromHash();
-renderDash(); renderWorkers(); renderItems(); renderOps(); renderOpsForm(); renderCards();
+renderDash(); renderWorkers(); renderItems(); renderOps(); renderOpsForm(); renderCards(); renderSide();
+recoverFromIDB();
 </script>
 </body>
 </html>
