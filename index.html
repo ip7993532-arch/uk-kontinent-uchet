@@ -1363,20 +1363,27 @@ setInterval(function(){
     });
   }
 },30000);
-// ---------- Индикатор онлайн-статуса ----------
-function updateNetInd(){
+// ---------- Индикатор онлайн-статуса (реальная проверка доступа к облаку) ----------
+let netCheckTimer=null;
+async function updateNetInd(){
   const el=document.getElementById("net_ind"); if(!el)return;
-  if(ghAuthed()){
-    const online=(navigator.onLine!==false)&&document.readyState!=="loading";
-    el.textContent=online?"Онлайн":"Оффлайн";
-    el.style.background=online?"rgba(31,122,77,.35)":"rgba(231,84,63,.35)";
-  }else{
-    el.textContent="Локально";
-    el.style.background="rgba(255,255,255,.15)";
+  if(!ghAuthed()){
+    el.textContent="Локально"; el.style.background="rgba(255,255,255,.15)"; return;
   }
+  el.textContent="…"; el.style.background="rgba(255,255,255,.15)";
+  let ok=false;
+  try{
+    const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(),8000);
+    const r=await fetch(RAW+"?t="+Date.now(),{cache:"no-store",signal:ctrl.signal});
+    clearTimeout(to);
+    ok=r.ok;
+  }catch(e){ok=false;}
+  if(ok){el.textContent="Онлайн"; el.style.background="rgba(31,122,77,.35)";}
+  else{el.textContent="Нет связи"; el.style.background="rgba(231,84,63,.5)";}
 }
-window.addEventListener("online",updateNetInd);
-window.addEventListener("offline",updateNetInd);
+window.addEventListener("online",()=>{updateNetInd();});
+window.addEventListener("offline",()=>{updateNetInd();});
+setInterval(function(){ if(isAuthed()&&ghAuthed())updateNetInd(); },45000);
 updateNetInd();
 </script>
 </body>
