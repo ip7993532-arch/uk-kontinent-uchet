@@ -417,7 +417,7 @@ async function ghWrite(blob){
     const rm=remote&&remote.s?normalizeState(remote.s):null;
     if(rm&&rm.requests){
       if(Array.isArray(rm.deletedRequests)){rm.deletedRequests.forEach(id=>{del[id]=1; if(!out.deletedRequests.includes(id))out.deletedRequests.push(id);});}
-      rm.requests.forEach(rr=>{ if(!del[rr.id]&&!out.requests.some(x=>x.id===rr.id))out.requests.push(rr); });
+      rm.requests.forEach(rr=>{ const ex=out.requests.find(x=>x.id===rr.id); if(!del[rr.id]&&!ex){out.requests.push(rr);} else if(ex&&!ex.approved&&rr.approved){ex.approved=true;} });
     }
     // повторная очистка: удаляем из итогового списка всё, что помечено удалённым в deletedRequests (в т.ч. из облака)
     out.requests=out.requests.filter(r=>!del[r.id]);
@@ -456,7 +456,7 @@ async function ghWrite(blob){
             // объединить актуальные заявки/задачи из облака в out
             const rm2=r2&&r2.s?normalizeState(r2.s):null;
             if(rm2&&rm2.deletedRequests){rm2.deletedRequests.forEach(id=>{if(!out.deletedRequests.includes(id))out.deletedRequests.push(id);});}
-            if(rm2&&rm2.requests){rm2.requests.forEach(rr=>{if(!rr.deleted&&!out.deletedRequests.includes(rr.id)&&!out.requests.some(x=>x.id===rr.id))out.requests.push(rr);});}
+            if(rm2&&rm2.requests){rm2.requests.forEach(rr=>{const ex2=out.requests.find(x=>x.id===rr.id);if(!rr.deleted&&!out.deletedRequests.includes(rr.id)&&!ex2){out.requests.push(rr);}else if(ex2&&!ex2.approved&&rr.approved){ex2.approved=true;}});}
             out.requests=out.requests.filter(x=>!out.deletedRequests.includes(x.id));
             if(rm2&&rm2.deletedEngTasks){rm2.deletedEngTasks.forEach(id=>{if(!out.deletedEngTasks.includes(id))out.deletedEngTasks.push(id);});}
             if(rm2&&rm2.engTasks){rm2.engTasks.forEach(rt=>{if(!rt.deleted&&!out.deletedEngTasks.includes(rt.id)&&!out.engTasks.some(x=>x.id===rt.id))out.engTasks.push(rt);});}
@@ -922,7 +922,7 @@ function ghWriteDirect(blob){
       const rm=remote&&remote.s?normalizeState(remote.s):null;
       if(rm&&rm.requests){
         if(Array.isArray(rm.deletedRequests)){rm.deletedRequests.forEach(id=>{del[id]=1; if(!out.deletedRequests.includes(id))out.deletedRequests.push(id);});}
-        rm.requests.forEach(rr=>{if(!del[rr.id]&&!out.requests.some(x=>x.id===rr.id))out.requests.push(rr);});
+        rm.requests.forEach(rr=>{const ex=out.requests.find(x=>x.id===rr.id);if(!del[rr.id]&&!ex){out.requests.push(rr);}else if(ex&&!ex.approved&&rr.approved){ex.approved=true;}});
       }
       out.requests=out.requests.filter(r=>!del[r.id]);
       if(!Array.isArray(out.engTasks))out.engTasks=[];
@@ -997,14 +997,7 @@ function renderEng(){
   const dInput=document.getElementById("eng_date"); if(!dInput)return;
   if(!dInput.value)dInput.value=today();
   const selDate=dInput.value;
-  // создаём/обновляем задачи из несогласованных заявок мастеров на дату подачи
-  state.requests.filter(r=>!r.deleted&&!r.approved&&!r.movedToEng).forEach(r=>{
-    const dd=(r.date||today());
-    const from=worker(r.fromId)?worker(r.fromId).name:(r.fromName||"");
-    state.engTasks.push({id:uid(),date:dd,time:"",text:"Заявка: "+r.name+" ("+from+"): "+r.src+" "+(r.note||""),fromRequest:r.id,approved:false});
-    r.movedToEng=true;
-  });
-  if(state.engTasks.some(t=>t.fromRequest))save();
+  // заявки не дублируются в план задач — они живут только во вкладке «Заявки»
   const t=document.getElementById("eng_tbl");
   const list=state.engTasks.filter(t=>!t.deleted&&t.date===selDate).sort((a,b)=>(a.time||"").localeCompare(b.time||""));
   if(!list.length){t.innerHTML='<div class="empty">Задач на этот день нет. Добавьте новую или откройте другой день.</div>';}
