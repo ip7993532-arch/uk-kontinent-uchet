@@ -345,7 +345,8 @@ setInterval(function(){
   if(isAuthed()){
     syncPull().then(ok=>{if(ok){save();renderCards();renderEng();}});
   }
-},30000);
+},12000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&isAuthed()){syncPull().then(ok=>{if(ok){save();renderCards();renderEng();}});}});
 </script>
 </body>
 </html>
