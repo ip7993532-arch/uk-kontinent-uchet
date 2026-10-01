@@ -399,7 +399,10 @@ async function syncPull(){
   }
   // объединяем заявки (не теряем ни из облака, ни локальные; удалённые убираем)
   const localDel={}; state.requests.forEach(lr=>{if(lr&&lr.deleted)localDel[lr.id]=1;});
+  // если заявка удалена в облаке — считаем её удалённой и локально (машина на ПК, телефон не возвращает)
+  rc.requests.forEach(rr=>{if(rr&&rr.deleted)localDel[rr.id]=1;});
   rc.requests=rc.requests.filter(r=>!r.deleted&&!localDel[r.id]);
+  state.requests=state.requests.filter(lr=>!lr.deleted&&!localDel[lr.id]);
   state.requests.forEach(lr=>{
     if(!lr.deleted&&!rc.requests.some(r=>r.id===lr.id))rc.requests.push(lr);
   });
@@ -668,7 +671,7 @@ function renderRequests(){
             '<td><button class="btn sm danger" data-rq="mdel" data-id="'+r.id+'">Уд.</button></td></tr>';
         }).join("")+"</tbody>";
       mt.querySelectorAll("[data-rq='mdel']").forEach(b=>b.onclick=()=>{
-        if(confirm("Удалить свою заявку?")){const r=state.requests.find(x=>x.id===b.dataset.id);if(r)r.deleted=true;save();renderRequests();alert("Заявка удалена.");}
+        if(confirm("Удалить свою заявку?")){const r=state.requests.find(x=>x.id===b.dataset.id);if(r)r.deleted=true;save();renderRequests();flushCloudWrite();alert("Заявка удалена.");}
       });
     }
     return;
@@ -691,7 +694,7 @@ function renderRequests(){
     r.approved=true; r.approvedAt=today(); save(); renderRequests();
   });
   t.querySelectorAll("[data-rq='del']").forEach(b=>b.onclick=()=>{
-    if(confirm("Удалить заявку?")){const r=state.requests.find(x=>x.id===b.dataset.id);if(r)r.deleted=true;save();renderRequests();}
+    if(confirm("Удалить заявку?")){const r=state.requests.find(x=>x.id===b.dataset.id);if(r)r.deleted=true;save();renderRequests();flushCloudWrite();}
   });
 }
 function isMobile(){
