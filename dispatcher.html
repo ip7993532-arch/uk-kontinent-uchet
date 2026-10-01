@@ -340,6 +340,12 @@ load(); loadFromHash();
 window.addEventListener("online",()=>renderCards());
 window.addEventListener("offline",()=>renderCards());
 if(isAuthed()){syncPull().then(ok=>{if(ok){save();renderCards();renderEng();}});}
+// периодическое обновление из облака: статусы «Выполнено», удаления и новые задачи подтягиваются автоматически
+setInterval(function(){
+  if(isAuthed()){
+    syncPull().then(ok=>{if(ok){save();renderCards();renderEng();}});
+  }
+},30000);
 </script>
 </body>
 </html>
