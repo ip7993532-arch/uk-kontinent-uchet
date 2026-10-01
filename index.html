@@ -159,6 +159,7 @@
     <button class="hbtn" id="bk_backup" title="Скачать резервную копию данных (.json)">Резервная копия</button>
     <button class="hbtn" id="bk_restore" title="Восстановить данные из .json">Восстановить</button>
     <button class="hbtn" id="bk_link" title="Скопировать ссылку с данными — на другом устройстве откроется это же">Ссылка с данными</button>
+    <button class="hbtn" id="refresh_btn" title="Принудительно обновить данные из облака">Обновить</button>
     <button class="hbtn" id="logout_btn" title="Выйти (сбросить запоминание входа на этом устройстве)">Выйти</button>
     <input type="file" id="bk_file" accept=".json,application/json" hidden>
   </div>
@@ -310,8 +311,8 @@
   <!-- ПОТРЕБНОСТИ -->
   <section class="panel" id="plneeds">
     <div class="card">
-      <h2>Заявки на потребности</h2>
-      <div class="muted" style="margin-bottom:6px">Отдельные списки по профессиям. Вносите позиции, затем распечатайте каждый слот отдельно на Word.</div>
+      <h2>Заявки на потребности <button class="btn sm ghost" id="needs_export_all" title="Скачать все слоты потребностей одним Word-документом">Экспорт всех в Word</button></h2>
+      <div class="muted" style="margin-bottom:6px">Отдельные списки по профессиям. Вносите позиции, затем распечатайте каждый слот отдельно или все сразу.</div>
     </div>
     <div id="needs_area"></div>
   </section>
@@ -832,7 +833,28 @@ function moveApprovedToNeeds(){
 }
 document.getElementById("rq_send").addEventListener("click",sendRequest);
 document.getElementById("rq_open_all").addEventListener("click",moveApprovedToNeeds);
+document.getElementById("needs_export_all").addEventListener("click",exportAllNeeds);
 window.addEventListener("resize",()=>{if(isMobile())renderRequests();});
+function exportAllNeeds(){
+  const parts=[];
+  state.needs.forEach(slot=>{
+    const rows=(slot.rows||[]).filter(r=>r.name).map(r=>[r.name,r.art||"",r.src||"",r.qty||"",(r.price===""||r.price==null)?(r.price||""):String(r.price)]);
+    if(!rows.length)return;
+    const author=needAuthor(slot.name);
+    parts.push(
+      "<div class='org'>Управляющая компания «КОНТИНЕНТ»</div>"+
+      "<h2 style='text-align:center'>Потребности — "+esc(slot.name)+"</h2>"+
+      "<table class='t' style='margin-top:8px;width:100%;border-collapse:collapse'>"+
+        "<tr><td style='border:none;padding:2px 6px'><b>Кому:</b> Шлеин П.С., руководитель</td></tr>"+
+        "<tr><td style='border:none;padding:2px 6px'><b>От кого:</b> "+(author?esc(author):"_________________")+" ("+esc(slot.name)+")</td></tr>"+
+      "</table><br>"+
+      wordTable("",["Позиция","Артикул","Откуда","Кол-во","Цена, ₽"],rows)+
+      "<div style='page-break-after:always'></div>"
+    );
+  });
+  if(!parts.length){alert("Слоты пусты — сначала добавьте позиции.");return;}
+  downloadDoc("potrebnosti_vse_"+today(), parts.join(""));
+}
 
 // ---------- Tabs ----------
 document.getElementById("tabs").addEventListener("click",e=>{
@@ -1255,6 +1277,14 @@ document.getElementById("cover_pass").addEventListener("keydown",e=>{if(e.key===
 if(isAuthed()){document.getElementById("cover").classList.add("hide");}
 document.getElementById("logout_btn").addEventListener("click",()=>{
   if(confirm("Выйти? После этого на этом устройстве снова будет запрашиваться пароль.")){setAuthed(false);location.reload();}
+});
+document.getElementById("refresh_btn").addEventListener("click",async()=>{
+  const btn=document.getElementById("refresh_btn"); btn.disabled=true; btn.textContent="Обновление…";
+  await syncPull();
+  save();
+  renderDash(); renderWorkers(); renderItems(); renderOps(); renderOpsForm(); renderCards(); renderSide(); renderNeeds(); renderRequests();
+  btn.disabled=false; btn.textContent="Обновить";
+  const el=document.getElementById("save_ind"); if(el){el.textContent="✓ Данные обновлены";el.style.opacity="1";setTimeout(()=>el.style.opacity="0",1800);}
 });
 
 // ---------- Резервная копия (перенос на другой ПК) ----------
