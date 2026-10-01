@@ -399,6 +399,8 @@ async function ghWrite(blob){
       if(Array.isArray(rm.deletedRequests)){rm.deletedRequests.forEach(id=>{del[id]=1; if(!out.deletedRequests.includes(id))out.deletedRequests.push(id);});}
       rm.requests.forEach(rr=>{ if(!del[rr.id]&&!out.requests.some(x=>x.id===rr.id))out.requests.push(rr); });
     }
+    // повторная очистка: удаляем из итогового списка всё, что помечено удалённым в deletedRequests (в т.ч. из облака)
+    out.requests=out.requests.filter(r=>!del[r.id]);
     // объединение потребностей (строки из облака, которых нет локально)
     if(rm&&rm.needs){for(let i=0;i<out.needs.length;i++){const tgt=out.needs[i];rm.needs[i]&&rm.needs[i].rows&&rm.needs[i].rows.forEach(rr=>{if(!tgt.rows.some(x=>x.name===rr.name&&x.art===rr.art&&x.qty===rr.qty))tgt.rows.push(rr);});}}
     const payload={s:out,ts:Date.now()};
@@ -848,6 +850,7 @@ function ghWriteDirect(blob){
         if(Array.isArray(rm.deletedRequests)){rm.deletedRequests.forEach(id=>{del[id]=1; if(!out.deletedRequests.includes(id))out.deletedRequests.push(id);});}
         rm.requests.forEach(rr=>{if(!del[rr.id]&&!out.requests.some(x=>x.id===rr.id))out.requests.push(rr);});
       }
+      out.requests=out.requests.filter(r=>!del[r.id]);
       if(rm&&rm.needs){for(let i=0;i<out.needs.length;i++){const tgt=out.needs[i];rm.needs[i]&&rm.needs[i].rows&&rm.needs[i].rows.forEach(rr=>{if(!tgt.rows.some(x=>x.name===rr.name&&x.art===rr.art&&x.qty===rr.qty))tgt.rows.push(rr);});}}
       const payload={s:out,ts:Date.now()};
       const enc=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
