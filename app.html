@@ -382,15 +382,15 @@ function ghToken(){
 function ghAuth(){return {Authorization:"token "+ghToken()};}
 function ghAuthed(){return !!ghToken();}
 async function ghRead(){
-  // Публичное чтение без токена (raw) — работает с любого ПК
-  try{
-    const r=await fetch(RAW,{cache:"no-store"});
-    if(r.ok){const t=await r.text(); if(t&&t.trim())return JSON.parse(t);}
-  }catch(e){}
-  // fallback на API с токеном
+  // свежее чтение через API (без кэша) — быстрая доставка актуальных данных
   try{
     const r=await fetch(API+"/contents/"+GH.file+"?ref="+GH.branch,{headers:Object.assign(ghAuth(),ghHeaders())});
     if(r.ok){const j=await r.json(); if(j&&j.content)return JSON.parse(decodeURIComponent(escape(atob(j.content.replace(/\s/g,"")))));}
+  }catch(e){}
+  // fallback на публичное чтение (raw)
+  try{
+    const r=await fetch(RAW,{cache:"no-store"});
+    if(r.ok){const t=await r.text(); if(t&&t.trim())return JSON.parse(t);}
   }catch(e){}
   return null;
 }
@@ -1592,7 +1592,7 @@ setInterval(function(){
       if(document.getElementById("plrequests").classList.contains("active"))renderRequests();
     });
   }
-},12000);
+},5000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&isAuthed()&&ghAuthed()){syncPull().then(()=>{renderRequests();renderEng();});}});
 // ---------- Индикатор онлайн-статуса (реальная проверка доступа к облаку) ----------
 let netCheckTimer=null;
