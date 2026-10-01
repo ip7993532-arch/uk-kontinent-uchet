@@ -332,10 +332,10 @@ async function ghWrite(blob){
 async function syncPull(){
   const remote=await ghRead();
   if(!remote||!remote.s||!remote.s.workers||!remote.s.items||!remote.s.tx)return false;
-  // принимаем удалённые данные (облако — источник истины), но при пустом remote оставляем локальные
+  const rc=normalizeState(remote.s);
   const hasLocal=state.workers.length||state.items.length||state.tx.length;
-  const hasRemote=remote.s.workers.length||remote.s.items.length||remote.s.tx.length;
-  if(hasRemote||!hasLocal){state=remote.s; return true;}
+  const hasRemote=rc.workers.length||rc.items.length||rc.tx.length;
+  if(hasRemote||!hasLocal){state=rc; return true;}
   return false;
 }
 const today=()=>{const d=new Date();return toISO(d);};
@@ -398,7 +398,7 @@ async function recoverFromIDB(){
   const rec=await idbLoad(); if(!rec||!rec.s||!rec.s.workers||!rec.s.items||!rec.s.tx)return;
   const lsEmpty=!state.workers.length&&!state.items.length&&!state.tx.length;
   if(lsEmpty){
-    state=rec.s; save();
+    state=normalizeState(rec.s); save();
     renderDash(); renderWorkers(); renderItems(); renderOps(); renderOpsForm(); renderCards(); renderSide(); renderNeeds();
   }
 }
@@ -921,7 +921,7 @@ function importBackup(file){
       const data=JSON.parse(r.result);
       const st=data.state;
       if(!st||!Array.isArray(st.workers)||!Array.isArray(st.items)||!Array.isArray(st.tx))throw new Error("bad");
-      state=st; save();
+      state=normalizeState(st); save();
 renderDash(); renderWorkers(); renderItems(); renderOps(); renderOpsForm(); renderCards(); renderSide(); renderNeeds();
       alert("Данные успешно восстановлены. Это окно можно закрыть.");
     }catch(e){alert("Некорректный файл резервной копии: данные не изменены.");}
@@ -957,7 +957,7 @@ function loadFromHash(){
   try{
     const st=b64ToState(decodeURIComponent(h.slice(6)));
     if(!st||!Array.isArray(st.workers)||!Array.isArray(st.items)||!Array.isArray(st.tx))throw new Error("bad");
-    state=st; save(); history.replaceState(null,"",location.pathname+location.search);
+    state=normalizeState(st); save(); history.replaceState(null,"",location.pathname+location.search);
   }catch(e){alert("Не удалось прочитать данные из ссылки. Возможно, она повреждена.");}
 }
 
