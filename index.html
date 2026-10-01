@@ -562,7 +562,10 @@ function renderNeeds(){
         "<tr><td style='border:none;padding:2px 6px'><b>Кому:</b> Шлеин П.С., руководитель</td></tr>"+
         "<tr><td style='border:none;padding:2px 6px'><b>От кого:</b> "+(author?esc(author):"_________________")+" ("+esc(slot.name)+")</td></tr>"+
       "</table><br>";
-    downloadDoc("potrebnosti_"+slug(slot.name)+"_"+today(), h+table+kit);
+    const sign="<table class='t' style='margin-top:14px;width:100%;border-collapse:collapse'>"+
+      "<tr><td style='border:none;padding:2px 6px'><b>Оформлено:</b> главный инженер — Назиров И.Е. ____________________</td></tr>"+
+      "</table>";
+    downloadDoc("potrebnosti_"+slug(slot.name)+"_"+today(), h+table+kit+sign);
   });
 }
 function slug(s){return String(s||"").toLowerCase().replace(/[^a-zа-яё0-9]+/gi,"-").replace(/^-+|-+$/g,"")||"slot";}
