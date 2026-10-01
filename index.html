@@ -89,6 +89,13 @@
     header .badge{display:none;}
     .hdr-actions .hbtn{display:none;}
     .hdr-actions #logout_btn{display:inline-block;}
+    /* на телефоне показываем только Карточки СИЗ и Заявки */
+    nav.tabs button[data-tab="dash"],
+    nav.tabs button[data-tab="workers"],
+    nav.tabs button[data-tab="ops"],
+    nav.tabs button[data-tab="control"],
+    nav.tabs button[data-tab="reports"],
+    nav.tabs button[data-tab="needs"]{display:none;}
     /* крупнее вкладки и формы на телефоне */
     .wrap{padding:12px;}
     nav.tabs button{padding:12px 14px; font-size:15px;}
