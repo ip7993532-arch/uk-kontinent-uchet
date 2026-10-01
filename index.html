@@ -873,7 +873,7 @@ document.getElementById("r_from").addEventListener("change",renderReports);
 document.getElementById("r_to").addEventListener("change",renderReports);
 
 // ---------- Обложка и вход по паролю ----------
-const AUTH_PASS="9977102";
+const AUTH_PASS="252525";
 function authKey(){return "uk_kon_auth";}
 function isAuthed(){try{return sessionStorage.getItem(authKey())==="1";}catch(e){return localStorage.getItem(authKey())==="1";}}
 function setAuthed(v){try{sessionStorage.setItem(authKey(),v?"1":"0");}catch(e){try{localStorage.setItem(authKey(),v?"1":"0");}catch(e2){}}}
