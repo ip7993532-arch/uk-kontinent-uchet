@@ -83,7 +83,24 @@
   .wcard.active .ct{background:rgba(255,255,255,.2); color:#fff;}
   body{padding-left:236px;}
   .wrap{max-width:1200px; margin:0 auto; padding:20px;}
-  @media(max-width:860px){ #side{display:none;} body{padding-left:0;} }
+  @media(max-width:860px){
+    #side{display:none;} body{padding-left:0;}
+    /* на телефоне прячем служебные кнопки и бейдж — интерфейс проще */
+    header .badge{display:none;}
+    .hdr-actions .hbtn{display:none;}
+    .hdr-actions #logout_btn{display:inline-block;}
+    /* крупнее вкладки и формы на телефоне */
+    .wrap{padding:12px;}
+    nav.tabs button{padding:12px 14px; font-size:15px;}
+    .btn{padding:12px 16px; font-size:15px;}
+    .btn.sm{padding:8px 12px; font-size:13px;}
+    input,select{font-size:16px; padding:11px 12px;}
+    .field label{font-size:13px;}
+    .card{padding:14px; margin-bottom:12px;}
+    header h1{font-size:18px;}
+    header{padding:12px 14px;}
+    .hbtn#logout_btn{font-size:14px;}
+  }
   /* Обложка на всю страницу */
   #cover{position:fixed; inset:0; z-index:100; background:linear-gradient(135deg,#1c3d6b 0%,#2A7F77 100%); color:#fff; display:flex; align-items:center; justify-content:center; transition:opacity .5s ease; overflow:auto;}
   #cover.hide{opacity:0; pointer-events:none;}
