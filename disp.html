@@ -148,8 +148,8 @@ function ghAuth(){return {Authorization:"token "+ghToken()};}
 function ghAuthed(){return !!ghToken();}
 function ghHeaders(){return {"Accept":"application/vnd.github.v3+json","Content-Type":"application/json"};}
 async function ghRead(){
-  try{const r=await fetch(RAW,{cache:"no-store"});if(r.ok){const t=await r.text();if(t&&t.trim())return JSON.parse(t);}}catch(e){}
   try{const r=await fetch(API+"/contents/"+GH.file+"?ref="+GH.branch,{headers:Object.assign(ghAuth(),ghHeaders())});if(r.ok){const j=await r.json();if(j&&j.content)return JSON.parse(decodeURIComponent(escape(atob(j.content.replace(/\s/g,"")))));}}catch(e){}
+  try{const r=await fetch(RAW,{cache:"no-store"});if(r.ok){const t=await r.text();if(t&&t.trim())return JSON.parse(t);}}catch(e){}
   return null;
 }
 async function ghWrite(blob){
@@ -345,7 +345,7 @@ setInterval(function(){
   if(isAuthed()){
     syncPull().then(ok=>{if(ok){save();renderCards();renderEng();}});
   }
-},12000);
+},5000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&isAuthed()){syncPull().then(ok=>{if(ok){save();renderCards();renderEng();}});}});
 </script>
 </body>
