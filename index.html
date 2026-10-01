@@ -157,6 +157,7 @@
   </div>
   <span class="badge">Главный инженер · автономный режим</span>
   <span class="badge" id="save_ind" style="transition:opacity .5s; opacity:0">✓ Сохранено</span>
+  <span class="badge" id="net_ind" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4)">…</span>
 </header>
 
 <div id="side"><h3>Работники</h3><div class="side-empty">Добавьте работников, чтобы они появились здесь.</div></div>
@@ -170,7 +171,7 @@
     <button data-tab="cards">Карточки СИЗ</button>
     <button data-tab="reports">Отчёты</button>
     <button data-tab="needs">Потребности</button>
-    <button data-tab="requests">Заявки</button>
+    <button data-tab="requests">Заявки<span id="req_badge" style="display:none;background:#e03131;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:6px;vertical-align:middle"></span></button>
   </nav>
 
   <!-- СВОДКА -->
@@ -663,8 +664,15 @@ function requestSlotName(fromName){
   return "";
 }
 function isMaster(w){const p=String((w&&w.post)||"").toLowerCase();return p.indexOf("мастер")>=0;}
+function updateReqBadge(){
+  const el=document.getElementById("req_badge"); if(!el)return;
+  const n=state.requests.filter(r=>!r.deleted&&!r.approved).length;
+  if(n>0){el.textContent=n;el.style.display="inline-block";}
+  else{el.style.display="none";}
+}
 function renderRequests(){
   const ws=document.getElementById("rq_from"); if(!ws)return;
+  updateReqBadge();
   const mobile=isMobile();
   // на ПК — только журнал согласования; на телефоне — форма отправки и «Мои заявки»
   const rqNew=document.getElementById("rq_new");
@@ -1341,10 +1349,28 @@ recoverFromIDB();
 if(isAuthed()){syncPull().then(ok=>{if(ok){save();renderDash();renderWorkers();renderItems();renderOps();renderOpsForm();renderCards();renderSide();renderNeeds();renderRequests();}});}
 // периодическое обновление статусов заявок из облака (мастер на телефоне видит «Согласована» без перезагрузки)
 setInterval(function(){
-  if(isAuthed()&&ghAuthed()&&(document.getElementById("plrequests").classList.contains("active")||isMobile())){
-    syncPull().then(()=>{renderRequests();});
+  if(isAuthed()&&ghAuthed()){
+    syncPull().then(()=>{
+      renderRequests(); // обновляет журнал и бейдж счётчика новых заявок
+      if(document.getElementById("plrequests").classList.contains("active"))renderRequests();
+    });
   }
-},25000);
+},30000);
+// ---------- Индикатор онлайн-статуса ----------
+function updateNetInd(){
+  const el=document.getElementById("net_ind"); if(!el)return;
+  if(ghAuthed()){
+    const online=(navigator.onLine!==false)&&document.readyState!=="loading";
+    el.textContent=online?"Онлайн":"Оффлайн";
+    el.style.background=online?"rgba(31,122,77,.35)":"rgba(231,84,63,.35)";
+  }else{
+    el.textContent="Локально";
+    el.style.background="rgba(255,255,255,.15)";
+  }
+}
+window.addEventListener("online",updateNetInd);
+window.addEventListener("offline",updateNetInd);
+updateNetInd();
 </script>
 </body>
 </html>
