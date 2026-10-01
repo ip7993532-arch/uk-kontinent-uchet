@@ -256,7 +256,7 @@
 
   <!-- ЗАЯВКИ -->
   <section class="panel" id="plrequests">
-    <div class="card">
+    <div class="card" id="rq_new">
       <h2>Новая заявка на потребности</h2>
       <div class="muted" style="margin-bottom:8px">Заявку можно отправить с любого устройства (телефон/ПК) — она сохранится в облаке и появится у инженера.</div>
       <div class="toolbar">
@@ -619,16 +619,18 @@ function requestSlotName(fromName){
 function renderRequests(){
   const ws=document.getElementById("rq_from"); if(!ws)return;
   const mobile=isMobile();
-  // заполнить «От кого» работниками
+  // на ПК — только журнал согласования; на телефоне — форма отправки и «Мои заявки»
+  const rqNew=document.getElementById("rq_new");
+  const journal=document.getElementById("rq_journal");
+  const mine=document.getElementById("rq_mine");
+  if(rqNew)rqNew.style.display=mobile?"":"none";
+  if(journal)journal.style.display=mobile?"none":"";
+  if(mine)mine.style.display=mobile?"":"none";
+  // заполнить «От кого» работниками (нужно и для формы на телефоне)
   const prev=ws.value;
   ws.length=0;
   state.workers.forEach(w=>{const o=document.createElement("option");o.value=w.id;o.textContent=w.name+(w.post&&w.post!=="—"?(" ("+w.post+")"):"");ws.appendChild(o);});
   if(prev&&[...ws.options].some(o=>o.value===prev))ws.value=prev;
-  // журнал согласования — только на ПК; на телефоне — «Мои заявки» со статусом
-  const journal=document.getElementById("rq_journal");
-  const mine=document.getElementById("rq_mine");
-  if(journal)journal.style.display=mobile?"none":"";
-  if(mine)mine.style.display=mobile?"":"none";
   if(mobile){
     const mt=document.getElementById("rq_mine_tbl");
     const meId=ws.value;
