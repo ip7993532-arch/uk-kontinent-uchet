@@ -359,13 +359,15 @@ async function ghWrite(blob){
       if(meta.content)remote=JSON.parse(decodeURIComponent(escape(atob(meta.content.replace(/\s/g,"")))));
     }catch(e){}
     const out=blob.s?JSON.parse(JSON.stringify(blob.s)):(blob&&blob.s?blob.s:{workers:[],items:[],tx:[]});
-    // объединение заявок (union по id — чужие не теряются; удалённые не восстанавливаются)
+    // объединение заявок (union по id — чужие не теряются; удалённые id в deletedRequests не восстанавливаются)
     if(!Array.isArray(out.requests))out.requests=[];
-    const deletedIds={}; out.requests.forEach(r=>{if(r&&r.deleted)deletedIds[r.id]=1;});
-    out.requests=out.requests.filter(r=>!r.deleted);
+    if(!Array.isArray(out.deletedRequests))out.deletedRequests=[];
+    const del=Object.create(null); out.deletedRequests.forEach(id=>del[id]=1);
+    out.requests=out.requests.filter(r=>!del[r.id]);
     const rm=remote&&remote.s?normalizeState(remote.s):null;
     if(rm&&rm.requests){
-      rm.requests.forEach(rr=>{ if(!rr.deleted&&!deletedIds[rr.id]&&!out.requests.some(x=>x.id===rr.id))out.requests.push(rr); });
+      if(Array.isArray(rm.deletedRequests)){rm.deletedRequests.forEach(id=>{del[id]=1; if(!out.deletedRequests.includes(id))out.deletedRequests.push(id);});}
+      rm.requests.forEach(rr=>{ if(!del[rr.id]&&!out.requests.some(x=>x.id===rr.id))out.requests.push(rr); });
     }
     // объединение потребностей (строки из облака, которых нет локально)
     if(rm&&rm.needs){for(let i=0;i<out.needs.length;i++){const tgt=out.needs[i];rm.needs[i]&&rm.needs[i].rows&&rm.needs[i].rows.forEach(rr=>{if(!tgt.rows.some(x=>x.name===rr.name&&x.art===rr.art&&x.qty===rr.qty))tgt.rows.push(rr);});}}
@@ -397,14 +399,14 @@ async function syncPull(){
       }
     });
   }
-  // объединяем заявки (не теряем ни из облака, ни локальные; удалённые убираем)
-  const localDel={}; state.requests.forEach(lr=>{if(lr&&lr.deleted)localDel[lr.id]=1;});
-  // если заявка удалена в облаке — считаем её удалённой и локально (машина на ПК, телефон не возвращает)
-  rc.requests.forEach(rr=>{if(rr&&rr.deleted)localDel[rr.id]=1;});
-  rc.requests=rc.requests.filter(r=>!r.deleted&&!localDel[r.id]);
-  state.requests=state.requests.filter(lr=>!lr.deleted&&!localDel[lr.id]);
+  // объединяем заявки (не теряем ни из облака, ни локальные; удалённые из deletedRequests не возвращаем)
+  const delIds=Object.create(null);
+  (state.deletedRequests||[]).forEach(id=>delIds[id]=1);
+  (rc.deletedRequests||[]).forEach(id=>delIds[id]=1);
+  rc.requests=rc.requests.filter(r=>!delIds[r.id]);
+  state.requests=state.requests.filter(r=>!delIds[r.id]);
   state.requests.forEach(lr=>{
-    if(!lr.deleted&&!rc.requests.some(r=>r.id===lr.id))rc.requests.push(lr);
+    if(!delIds[lr.id]&&!rc.requests.some(r=>r.id===lr.id))rc.requests.push(lr);
   });
   const hasLocal=state.workers.length||state.items.length||state.tx.length;
   const hasRemote=rc.workers.length||rc.items.length||rc.tx.length;
@@ -453,6 +455,7 @@ function normalizeState(s){
   if(!Array.isArray(s.tx))s.tx=[];
   if(!Array.isArray(s.requests))s.requests=[];
   if(!Array.isArray(s.needs))s.needs=[{name:"Слесарь",rows:[]},{name:"Водитель",rows:[]},{name:"Мастер участка",rows:[]}];
+  if(!Array.isArray(s.deletedRequests))s.deletedRequests=[];
   s.needs.forEach(n=>{if(!n.rows) n.rows=[]; if(!n.name)n.name="—"; n.rows.forEach(r=>{if(!r.src)r.src="ВБ";});});
   if(s.needs.length<3){while(s.needs.length<3)s.needs.push({name:["Слесарь","Водитель","Мастер участка"][s.needs.length],rows:[]});}
   return s;
@@ -671,7 +674,12 @@ function renderRequests(){
             '<td><button class="btn sm danger" data-rq="mdel" data-id="'+r.id+'">Уд.</button></td></tr>';
         }).join("")+"</tbody>";
       mt.querySelectorAll("[data-rq='mdel']").forEach(b=>b.onclick=()=>{
-        if(confirm("Удалить свою заявку?")){const r=state.requests.find(x=>x.id===b.dataset.id);if(r)r.deleted=true;save();renderRequests();flushCloudWrite();alert("Заявка удалена.");}
+        if(confirm("Удалить свою заявку?")){
+          const id=b.dataset.id;
+          state.requests=state.requests.filter(x=>x.id!==id);
+          if(!state.deletedRequests.includes(id))state.deletedRequests.push(id);
+          save();renderRequests();flushCloudWrite();alert("Заявка удалена.");
+        }
       });
     }
     return;
@@ -694,7 +702,12 @@ function renderRequests(){
     r.approved=true; r.approvedAt=today(); save(); renderRequests();
   });
   t.querySelectorAll("[data-rq='del']").forEach(b=>b.onclick=()=>{
-    if(confirm("Удалить заявку?")){const r=state.requests.find(x=>x.id===b.dataset.id);if(r)r.deleted=true;save();renderRequests();flushCloudWrite();}
+    if(confirm("Удалить заявку?")){
+      const id=b.dataset.id;
+      state.requests=state.requests.filter(x=>x.id!==id);
+      if(!state.deletedRequests.includes(id))state.deletedRequests.push(id);
+      save();renderRequests();flushCloudWrite();
+    }
   });
 }
 function isMobile(){
@@ -749,10 +762,14 @@ function ghWriteDirect(blob){
       }catch(e){}
       const out=blob.s?JSON.parse(JSON.stringify(blob.s)):{workers:[],items:[],tx:[]};
       if(!Array.isArray(out.requests))out.requests=[];
-      const deletedIds={}; out.requests.forEach(r=>{if(r&&r.deleted)deletedIds[r.id]=1;});
-      out.requests=out.requests.filter(r=>!r.deleted);
+      if(!Array.isArray(out.deletedRequests))out.deletedRequests=[];
+      const del=Object.create(null); out.deletedRequests.forEach(id=>del[id]=1);
+      out.requests=out.requests.filter(r=>!del[r.id]);
       const rm=remote&&remote.s?normalizeState(remote.s):null;
-      if(rm&&rm.requests){rm.requests.forEach(rr=>{if(!rr.deleted&&!deletedIds[rr.id]&&!out.requests.some(x=>x.id===rr.id))out.requests.push(rr);});}
+      if(rm&&rm.requests){
+        if(Array.isArray(rm.deletedRequests)){rm.deletedRequests.forEach(id=>{del[id]=1; if(!out.deletedRequests.includes(id))out.deletedRequests.push(id);});}
+        rm.requests.forEach(rr=>{if(!del[rr.id]&&!out.requests.some(x=>x.id===rr.id))out.requests.push(rr);});
+      }
       if(rm&&rm.needs){for(let i=0;i<out.needs.length;i++){const tgt=out.needs[i];rm.needs[i]&&rm.needs[i].rows&&rm.needs[i].rows.forEach(rr=>{if(!tgt.rows.some(x=>x.name===rr.name&&x.art===rr.art&&x.qty===rr.qty))tgt.rows.push(rr);});}}
       const payload={s:out,ts:Date.now()};
       const enc=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
