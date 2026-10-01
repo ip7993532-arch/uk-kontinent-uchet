@@ -1588,10 +1588,12 @@ setInterval(function(){
   if(isAuthed()&&ghAuthed()){
     syncPull().then(()=>{
       renderRequests(); // обновляет журнал и бейдж счётчика новых заявок
+      renderEng();
       if(document.getElementById("plrequests").classList.contains("active"))renderRequests();
     });
   }
-},30000);
+},12000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&isAuthed()&&ghAuthed()){syncPull().then(()=>{renderRequests();renderEng();});}});
 // ---------- Индикатор онлайн-статуса (реальная проверка доступа к облаку) ----------
 let netCheckTimer=null;
 async function updateNetInd(){
