@@ -171,7 +171,7 @@ async function ghWrite(blob){
     if(!Array.isArray(out.deletedEngTasks))out.deletedEngTasks=[];
     const dt={};out.deletedEngTasks.forEach(id=>dt[id]=1);
     out.engTasks=out.engTasks.filter(t=>!dt[t.id]&&!t.deleted);
-    if(rm&&rm.engTasks){if(Array.isArray(rm.deletedEngTasks)){rm.deletedEngTasks.forEach(id=>{dt[id]=1;if(!out.deletedEngTasks.includes(id))out.deletedEngTasks.push(id);});}rm.engTasks.forEach(rt=>{if(rt&&rt.deleted)dt[rt.id]=1;const ex=out.engTasks.find(x=>x.id===rt.id);if(ex){if(rt.done!==undefined)ex.done=rt.done;}else if(!rt.deleted&&!dt[rt.id])out.engTasks.push(rt);});}
+    if(rm&&rm.engTasks){if(Array.isArray(rm.deletedEngTasks)){rm.deletedEngTasks.forEach(id=>{dt[id]=1;if(!out.deletedEngTasks.includes(id))out.deletedEngTasks.push(id);});}rm.engTasks.forEach(rt=>{if(rt&&rt.deleted)dt[rt.id]=1;const ex=out.engTasks.find(x=>x.id===rt.id);if(ex){ex.done=ex.done||!!rt.done;}else if(!rt.deleted&&!dt[rt.id])out.engTasks.push(rt);});}
     out.engTasks=out.engTasks.filter(t=>!dt[t.id]&&!t.deleted);
     if(rm&&rm.needs){for(let i=0;i<out.needs.length;i++){const tgt=out.needs[i];rm.needs[i]&&rm.needs[i].rows&&rm.needs[i].rows.forEach(rr=>{if(!tgt.rows.some(x=>x.name===rr.name&&x.art===rr.art&&x.qty===rr.qty))tgt.rows.push(rr);});}}
     const payload={s:out,ts:Date.now()};
@@ -206,7 +206,7 @@ async function syncPull(){
   (state.engTasks||[]).forEach(t=>{if(t&&t.deleted)dt[t.id]=1;});(rc.engTasks||[]).forEach(t=>{if(t&&t.deleted)dt[t.id]=1;});
   rc.engTasks=rc.engTasks.filter(t=>!dt[t.id]&&!t.deleted);
   state.engTasks=state.engTasks.filter(t=>!dt[t.id]&&!t.deleted);
-  (state.engTasks||[]).forEach(lt=>{if(!lt||lt.deleted||dt[lt.id])return;const ex=rc.engTasks.find(x=>x.id===lt.id);if(!ex)rc.engTasks.push(lt);else{if(lt.done!==undefined)ex.done=lt.done;}});
+  (state.engTasks||[]).forEach(lt=>{const ex=rc.engTasks.find(x=>x.id===lt.id);if(!ex){if(!dt[lt.id])rc.engTasks.push(lt);}else{ex.done=ex.done||!!lt.done;}});
   rc.engTasks=rc.engTasks.filter(t=>!dt[t.id]&&!t.deleted);
   const hasLocal=rc.workers.length||rc.items.length;
   if(hasLocal){state=rc;return true;}
