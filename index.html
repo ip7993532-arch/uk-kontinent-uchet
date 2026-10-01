@@ -996,7 +996,7 @@ function renderEng(){
     const x=same[idx]; if(!x)return;
     if(b.dataset.eng==="done"){x.done=!x.done;}
     else if(b.dataset.eng==="del"){if(confirm("Удалить задачу?")){x.deleted=true;}}
-    save(); renderEng();
+    save(); renderEng(); flushCloudWrite();
   });
 }
 document.getElementById("eng_add").addEventListener("click",()=>{
