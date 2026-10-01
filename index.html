@@ -97,7 +97,8 @@
     nav.tabs button[data-tab="ops"],
     nav.tabs button[data-tab="control"],
     nav.tabs button[data-tab="reports"],
-    nav.tabs button[data-tab="needs"]{display:none;}
+    nav.tabs button[data-tab="needs"],
+    nav.tabs button[data-tab="eng"]{display:none;}
     /* крупнее вкладки и формы на телефоне */
     .wrap{padding:12px;}
     nav.tabs button{padding:12px 14px; font-size:15px;}
@@ -182,6 +183,7 @@
     <button data-tab="reports">Отчёты</button>
     <button data-tab="needs">Потребности</button>
     <button data-tab="requests">Заявки<span id="req_badge" style="display:none;background:#e03131;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:6px;vertical-align:middle"></span></button>
+    <button data-tab="eng">Инженер</button>
   </nav>
 
   <!-- СВОДКА -->
@@ -308,6 +310,24 @@
       <h2>Журнал заявок на согласование <button class="btn sm ghost" id="rq_open_all">Перенести согласованные в потребности</button>
       <select id="rq_filter" style="margin-left:10px;padding:4px 8px;font-size:12px"><option value="all">Все</option><option value="new">Новые</option><option value="ok">Согласованные</option></select></h2>
       <div class="scroll"><table id="rq_tbl"></table></div>
+    </div>
+  </section>
+
+  <!-- ИНЖЕНЕР: план задач -->
+  <section class="panel" id="pleng">
+    <div class="card">
+      <h2>План задач инженера на сегодня</h2>
+      <div class="muted" style="margin-bottom:8px">Сюда попадают новые заявки от мастеров и ваши собственные задачи. Выберите день в календаре и добавьте задачи на этот или другой день.</div>
+      <div class="toolbar" style="align-items:center">
+        <div class="field"><label>Дата</label><input type="date" id="eng_date"></div>
+        <div class="field"><label>Время</label><input type="time" id="eng_time"></div>
+        <div class="field"><label>Задача</label><input id="eng_text" placeholder="Что нужно сделать" style="min-width:220px"></div>
+        <button class="btn" id="eng_add">Добавить задачу</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Задачи на выбранный день</h2>
+      <div class="scroll"><table id="eng_tbl"></table></div>
     </div>
   </section>
 
@@ -486,10 +506,16 @@ function normalizeState(s){
   if(!Array.isArray(s.items))s.items=[];
   if(!Array.isArray(s.tx))s.tx=[];
   if(!Array.isArray(s.requests))s.requests=[];
-  if(!Array.isArray(s.needs))s.needs=[{name:"Слесарь",rows:[]},{name:"Водитель",rows:[]},{name:"Мастер участка",rows:[]}];
-  if(!Array.isArray(s.deletedRequests))s.deletedRequests=[];
+  if(!Array.isArray(s.needs))s.needs=[{name:"Водитель",rows:[]},{name:"Мастер участка",rows:[]}];
+  // исключаем слот «Слесарь» (нужны только Водитель и Мастер участка)
+  s.needs=s.needs.filter(n=>n&&n.name!=="Слесарь");
   s.needs.forEach(n=>{if(!n.rows) n.rows=[]; if(!n.name)n.name="—"; n.rows.forEach(r=>{if(!r.src)r.src="ВБ";});});
-  if(s.needs.length<3){while(s.needs.length<3)s.needs.push({name:["Слесарь","Водитель","Мастер участка"][s.needs.length],rows:[]});}
+  if(!Array.isArray(s.deletedRequests))s.deletedRequests=[];
+  if(!Array.isArray(s.engTasks))s.engTasks=[];
+  s.engTasks.forEach(t=>{if(!t.done)t.done=false;});
+  // если нужно — дополняем список до 2 слотов (Водитель, Мастер участка)
+  const NEED_DEF=[{name:"Водитель",rows:[]},{name:"Мастер участка",rows:[]}];
+  if(s.needs.length<2){for(const d of NEED_DEF){if(!s.needs.some(n=>n.name===d.name))s.needs.push(d);}}
   return s;
 }
 function normalizeRemote(s){try{return normalizeState(s);}catch(e){return null;}}
@@ -537,7 +563,7 @@ function dueDate(itemId,acc){
 }
 
 // ---------- Потребности по профессиям ----------
-const NEED_SLOTS=[{name:"Слесарь",key:"Слесарь"},{name:"Водитель",key:"Водитель"},{name:"Мастер участка",key:"Мастер участка"}];
+const NEED_SLOTS=[{name:"Водитель",key:"Водитель"},{name:"Мастер участка",key:"Мастер участка"}];
 function needSlot(i){return state.needs[i]||{name:NEED_SLOTS[i]?NEED_SLOTS[i].name:"—",rows:[]};}
 // поиск работника из общей базы по должности (для поля «От кого»)
 function needAuthor(slotName){
@@ -904,6 +930,49 @@ function exportAllNeeds(){
   downloadDoc("potrebnosti_vse_"+today(), parts.join(""));
 }
 
+// ---------- Инженер: план задач ----------
+function renderEng(){
+  const dInput=document.getElementById("eng_date"); if(!dInput)return;
+  if(!dInput.value)dInput.value=today();
+  const selDate=dInput.value;
+  // создаём/обновляем задачи из несогласованных заявок мастеров на дату подачи
+  state.requests.filter(r=>!r.deleted&&!r.approved&&!r.movedToEng).forEach(r=>{
+    const dd=(r.date||today());
+    const from=worker(r.fromId)?worker(r.fromId).name:(r.fromName||"");
+    state.engTasks.push({id:uid(),date:dd,time:"",text:"Заявка: "+r.name+" ("+from+"): "+r.src+" "+(r.note||""),fromRequest:r.id,approved:false});
+    r.movedToEng=true;
+  });
+  if(state.engTasks.some(t=>t.fromRequest))save();
+  const t=document.getElementById("eng_tbl");
+  const list=state.engTasks.filter(t=>!t.deleted&&t.date===selDate).sort((a,b)=>(a.time||"").localeCompare(b.time||""));
+  if(!list.length){t.innerHTML='<div class="empty">Задач на этот день нет. Добавьте новую или откройте другой день.</div>';}
+  else t.innerHTML="<thead><tr><th>Время</th><th>Задача</th><th>Статус</th><th></th></tr></thead><tbody>"+
+    list.map((x,xi)=>{
+      const st=x.done?"<span class='tag ok'>Выполнено</span>":"<span class='tag warn'>В работе</span>";
+      return "<tr"+(x.done?" style='opacity:.6'":"")+"><td>"+esc(x.time||"—")+"</td><td>"+esc(x.text)+"</td><td>"+st+"</td>"+
+        '<td class="action-row">'+
+        '<button class="btn sm ghost" data-eng="done" data-idx="'+xi+'" data-date="'+selDate+'">'+(x.done?"Отметить снова":"Выполнено")+'</button>'+
+        '<button class="btn sm danger" data-eng="del" data-idx="'+xi+'" data-date="'+selDate+'">Уд.</button></td></tr>';
+    }).join("")+"</tbody>";
+  t.querySelectorAll("[data-eng]").forEach(b=>b.onclick=()=>{
+    const idx=+b.dataset.idx; const dd=b.dataset.date;
+    const same=state.engTasks.filter(x=>!x.deleted&&x.date===dd);
+    const x=same[idx]; if(!x)return;
+    if(b.dataset.eng==="done"){x.done=!x.done;}
+    else if(b.dataset.eng==="del"){if(confirm("Удалить задачу?")){x.deleted=true;}}
+    save(); renderEng();
+  });
+}
+document.getElementById("eng_add").addEventListener("click",()=>{
+  const d=document.getElementById("eng_date").value||today();
+  const tm=document.getElementById("eng_time").value;
+  const tx=document.getElementById("eng_text").value.trim();
+  if(!tx){alert("Введите задачу");return;}
+  state.engTasks.push({id:uid(),date:d,time:tm,text:tx,done:false});
+  save(); renderEng();
+  document.getElementById("eng_text").value=""; document.getElementById("eng_time").value="";
+});
+
 // ---------- Tabs ----------
 document.getElementById("tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
@@ -916,6 +985,7 @@ document.getElementById("tabs").addEventListener("click",e=>{
   if(b.dataset.tab==="dash")renderDash();
   if(b.dataset.tab==="needs")renderNeeds();
   if(b.dataset.tab==="requests")renderRequests();
+  if(b.dataset.tab==="eng")renderEng();
 });
 
 // ---------- Workers ----------
@@ -1302,6 +1372,7 @@ function qGo(tab){
   if(tab==="dash")renderDash();
   if(tab==="needs")renderNeeds();
   if(tab==="requests")renderRequests();
+  if(tab==="eng")renderEng();
 }
 
 document.getElementById("r_from").addEventListener("change",renderReports);
@@ -1441,10 +1512,10 @@ function closeModal(){document.getElementById("modal").classList.remove("open");
 
 // Init
 loadFromHash();
-renderDash(); renderWorkers(); renderItems(); renderOps(); renderOpsForm(); renderCards(); renderSide(); renderNeeds(); renderRequests();
+renderDash(); renderWorkers(); renderItems(); renderOps(); renderOpsForm(); renderCards(); renderSide(); renderNeeds(); renderRequests(); renderEng();
 recoverFromIDB();
 // если уже авторизован в этой сессии — подтянуть свежие онлайн-данные
-if(isAuthed()){syncPull().then(ok=>{if(ok){save();renderDash();renderWorkers();renderItems();renderOps();renderOpsForm();renderCards();renderSide();renderNeeds();renderRequests();}});}
+if(isAuthed()){syncPull().then(ok=>{if(ok){save();renderDash();renderWorkers();renderItems();renderOps();renderOpsForm();renderCards();renderSide();renderNeeds();renderRequests();renderEng();}});}
 // периодическое обновление статусов заявок из облака (мастер на телефоне видит «Согласована» без перезагрузки)
 setInterval(function(){
   if(isAuthed()&&ghAuthed()){
