@@ -469,7 +469,7 @@ function renderNeeds(){
         '<div class="field"><label>Позиция</label><input data-need="name" data-si="'+si+'" placeholder="Наименование"></div>'+
         '<div class="field" data-need="artfield" data-si="'+si+'"><label>Артикул</label><input data-need="art" data-si="'+si+'" placeholder="Код" style="width:110px"></div>'+
         '<div class="field"><label>Откуда</label><select data-need="src" data-si="'+si+'" style="width:140px">'+
-          '<option value="ВБ">ВБ</option><option value="Озон">Озон</option><option value="Иностранный сайт">Иностранный сайт</option>'+
+          '<option value="ВБ">ВБ</option><option value="Озон">Озон</option><option value="Иностороний сайт">Иностороний сайт</option>'+
         '</select></div>'+
         '<div class="field"><label>Кол-во</label><input data-need="qty" data-si="'+si+'" placeholder="шт." style="width:70px"></div>'+
         '<div class="field"><label>Цена, ₽</label><input data-need="price" data-si="'+si+'" placeholder="0,00" style="width:90px"></div>'+
@@ -482,7 +482,7 @@ function renderNeeds(){
     const sel=area.querySelector('[data-need="src"][data-si="'+si+'"]');
     const af=area.querySelector('[data-need="artfield"][data-si="'+si+'"]');
     if(!sel||!af)return;
-    if(sel.value==="Иностранный сайт"){af.style.display="none";}
+    if(sel.value==="Иностороний сайт"){af.style.display="none";}
     else{af.style.display="";}
   }
   area.querySelectorAll("[data-need='src']").forEach(s=>{
@@ -495,7 +495,7 @@ function renderNeeds(){
     area.querySelector('[data-need="name"][data-si="'+si+'"]').value=row.name||"";
     area.querySelector('[data-need="art"][data-si="'+si+'"]').value=row.art||"";
     const srcSel=area.querySelector('[data-need="src"][data-si="'+si+'"]');
-    if(srcSel){srcSel.value=["ВБ","Озон","Иностранный сайт"].indexOf(row.src)>=0?row.src:"ВБ"; toggleArt(si);}
+    if(srcSel){srcSel.value=["ВБ","Озон","Иностороний сайт"].indexOf(row.src)>=0?row.src:"ВБ"; toggleArt(si);}
     area.querySelector('[data-need="qty"][data-si="'+si+'"]').value=row.qty||"";
     area.querySelector('[data-need="price"][data-si="'+si+'"]').value=(row.price===""||row.price==null)?(row.price||""):String(row.price);
     const addBtn=area.querySelector('[data-need="add"][data-si="'+si+'"]');
