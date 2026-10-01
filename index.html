@@ -421,6 +421,20 @@ async function ghWrite(blob){
     }
     // повторная очистка: удаляем из итогового списка всё, что помечено удалённым в deletedRequests (в т.ч. из облака)
     out.requests=out.requests.filter(r=>!del[r.id]);
+    // объединение задач инженера (union по id — задачи с других ПК не теряются; удалённые не возвращаются)
+    if(!Array.isArray(out.engTasks))out.engTasks=[];
+    const delTaskIds={}; out.engTasks.forEach(t=>{if(t&&t.deleted)delTaskIds[t.id]=1;});
+    if(rm&&rm.engTasks){
+      rm.engTasks.forEach(rt=>{
+        if(rt&&rt.deleted)delTaskIds[rt.id]=1;
+        const existing=out.engTasks.find(x=>x.id===rt.id);
+        if(existing){ // обновляем статус из облака
+          if(rt.done!==undefined)existing.done=rt.done;
+          existing.deleted=!!rt.deleted;
+        }else if(!rt.deleted){out.engTasks.push(rt);}
+      });
+    }
+    out.engTasks=out.engTasks.filter(t=>!delTaskIds[t.id]&&!t.deleted);
     // объединение потребностей (строки из облака, которых нет локально)
     if(rm&&rm.needs){for(let i=0;i<out.needs.length;i++){const tgt=out.needs[i];rm.needs[i]&&rm.needs[i].rows&&rm.needs[i].rows.forEach(rr=>{if(!tgt.rows.some(x=>x.name===rr.name&&x.art===rr.art&&x.qty===rr.qty))tgt.rows.push(rr);});}}
     const payload={s:out,ts:Date.now()};
@@ -432,6 +446,7 @@ async function ghWrite(blob){
     // после успеха актуализируем локальное состояние (другие устройства)
     if(state.requests)state.requests=out.requests;
     if(state.needs)state.needs=out.needs;
+    if(state.engTasks)state.engTasks=out.engTasks;
   }catch(e){console.warn("ghWrite err",e);}
   ghSyncBusy=false;
   if(ghQueued){ghQueued=false; const j=JSON.stringify({s:state,ts:Date.now()}); ghWrite(JSON.parse(j));}
@@ -460,6 +475,16 @@ async function syncPull(){
   state.requests.forEach(lr=>{
     if(!delIds[lr.id]&&!rc.requests.some(r=>r.id===lr.id))rc.requests.push(lr);
   });
+  // объединяем задачи инженера (не теряем с других ПК; удалённые не возвращаем)
+  const delTaskIds={}; (state.engTasks||[]).forEach(t=>{if(t&&t.deleted)delTaskIds[t.id]=1;});
+  (rc.engTasks||[]).forEach(t=>{if(t&&t.deleted)delTaskIds[t.id]=1;});
+  (state.engTasks||[]).forEach(lt=>{
+    if(!lt||lt.deleted||delTaskIds[lt.id])return;
+    const ex=rc.engTasks.find(x=>x.id===lt.id);
+    if(!ex){rc.engTasks.push(lt);}
+    else{if(lt.done!==undefined)ex.done=lt.done;}
+  });
+  rc.engTasks=rc.engTasks.filter(t=>!delTaskIds[t.id]&&!t.deleted);
   const hasLocal=state.workers.length||state.items.length||state.tx.length;
   const hasRemote=rc.workers.length||rc.items.length||rc.tx.length;
   if(hasRemote||!hasLocal){state=rc; return true;}
@@ -877,6 +902,17 @@ function ghWriteDirect(blob){
         rm.requests.forEach(rr=>{if(!del[rr.id]&&!out.requests.some(x=>x.id===rr.id))out.requests.push(rr);});
       }
       out.requests=out.requests.filter(r=>!del[r.id]);
+      if(!Array.isArray(out.engTasks))out.engTasks=[];
+      const delTaskIds={}; out.engTasks.forEach(t=>{if(t&&t.deleted)delTaskIds[t.id]=1;});
+      if(rm&&rm.engTasks){
+        rm.engTasks.forEach(rt=>{
+          if(rt&&rt.deleted)delTaskIds[rt.id]=1;
+          const existing=out.engTasks.find(x=>x.id===rt.id);
+          if(existing){if(rt.done!==undefined)existing.done=rt.done;existing.deleted=!!rt.deleted;}
+          else if(!rt.deleted){out.engTasks.push(rt);}
+        });
+      }
+      out.engTasks=out.engTasks.filter(t=>!delTaskIds[t.id]&&!t.deleted);
       if(rm&&rm.needs){for(let i=0;i<out.needs.length;i++){const tgt=out.needs[i];rm.needs[i]&&rm.needs[i].rows&&rm.needs[i].rows.forEach(rr=>{if(!tgt.rows.some(x=>x.name===rr.name&&x.art===rr.art&&x.qty===rr.qty))tgt.rows.push(rr);});}}
       const payload={s:out,ts:Date.now()};
       const enc=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
