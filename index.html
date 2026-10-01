@@ -350,12 +350,13 @@ async function ghWrite(blob){
   if(ghSyncBusy){ghQueued=true; return;}
   ghSyncBusy=true;
   try{
-    // перед записью перечитываем актуальное облако и объединяем заявки/потребности,
-    // чтобы заявки с телефона не затирались автосохранением с ПК
-    let remote=null;
-    try{const raw=await fetch(RAW,{cache:"no-store"}); if(raw.ok){const t=await raw.text(); if(t&&t.trim())remote=JSON.parse(t);}}catch(e){}
+    // читаем актуальное облако через API (свежие данные + sha) и объединяем заявки/потребности,
+    // чтобы заявки с телефона не затирались автосохранением с ПК (RAW кэшируется и может быть устаревшим)
+    let sha=null, remote=null;
     try{
-      if(!remote){const r=await fetch(API+"/contents/"+GH.file+"?ref="+GH.branch,{headers:Object.assign(ghAuth(),ghHeaders())}); if(r.ok){const j=await r.json(); if(j&&j.content)remote=JSON.parse(decodeURIComponent(escape(atob(j.content.replace(/\s/g,"")))));}}
+      const meta=await (await fetch(API+"/contents/"+GH.file+"?ref="+GH.branch,{headers:Object.assign(ghAuth(),ghHeaders())})).json();
+      if(meta.sha)sha=meta.sha;
+      if(meta.content)remote=JSON.parse(decodeURIComponent(escape(atob(meta.content.replace(/\s/g,"")))));
     }catch(e){}
     const out=blob.s?JSON.parse(JSON.stringify(blob.s)):(blob&&blob.s?blob.s:{workers:[],items:[],tx:[]});
     // объединение заявок (union по id — чужие не теряются)
@@ -365,9 +366,6 @@ async function ghWrite(blob){
     }
     // объединение потребностей (строки из облака, которых нет локально)
     if(rm&&rm.needs){for(let i=0;i<out.needs.length;i++){const tgt=out.needs[i];rm.needs[i]&&rm.needs[i].rows&&rm.needs[i].rows.forEach(rr=>{if(!tgt.rows.some(x=>x.name===rr.name&&x.art===rr.art&&x.qty===rr.qty))tgt.rows.push(rr);});}}
-    // получить текущий sha файла
-    let sha=null;
-    try{const meta=await (await fetch(API+"/contents/"+GH.file+"?ref="+GH.branch,{headers:Object.assign(ghAuth(),ghHeaders())})).json(); if(meta.sha)sha=meta.sha;}catch(e){}
     const payload={s:out,ts:Date.now()};
     const enc=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
     const body={message:"Автосохранение",content:enc,branch:GH.branch};
@@ -736,14 +734,17 @@ function ghWriteDirect(blob){
   return (async()=>{
     let ok=false;
     try{
-      let remote=null;
-      try{const raw=await fetch(RAW,{cache:"no-store"}); if(raw.ok){const t=await raw.text(); if(t&&t.trim())remote=JSON.parse(t);}}catch(e){}
+      // свежее чтение облака через API (RAW кэшируется и может быть устаревшим)
+      let remote=null, sha=null;
+      try{
+        const meta=await (await fetch(API+"/contents/"+GH.file+"?ref="+GH.branch,{headers:Object.assign(ghAuth(),ghHeaders())})).json();
+        if(meta.sha)sha=meta.sha;
+        if(meta.content)remote=JSON.parse(decodeURIComponent(escape(atob(meta.content.replace(/\s/g,"")))));
+      }catch(e){}
       const out=blob.s?JSON.parse(JSON.stringify(blob.s)):{workers:[],items:[],tx:[]};
       const rm=remote&&remote.s?normalizeState(remote.s):null;
       if(rm&&rm.requests){rm.requests.forEach(rr=>{if(!out.requests.some(x=>x.id===rr.id))out.requests.push(rr);});}
       if(rm&&rm.needs){for(let i=0;i<out.needs.length;i++){const tgt=out.needs[i];rm.needs[i]&&rm.needs[i].rows&&rm.needs[i].rows.forEach(rr=>{if(!tgt.rows.some(x=>x.name===rr.name&&x.art===rr.art&&x.qty===rr.qty))tgt.rows.push(rr);});}}
-      let sha=null;
-      try{const meta=await (await fetch(API+"/contents/"+GH.file+"?ref="+GH.branch,{headers:Object.assign(ghAuth(),ghHeaders())})).json(); if(meta.sha)sha=meta.sha;}catch(e){}
       const payload={s:out,ts:Date.now()};
       const enc=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
       const body={message:"Автосохранение",content:enc,branch:GH.branch};
