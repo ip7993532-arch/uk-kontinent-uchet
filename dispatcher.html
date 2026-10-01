@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>УК Континент — Диспетчер</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2324518f'/%3E%3Cstop offset='1' stop-color='%232A7F77'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Ctext x='32' y='42' font-family='Arial,sans-serif' font-size='22' font-weight='800' fill='white' text-anchor='middle'%3E%D0%94%3C/text%3E%3C/svg%3E">
+<style>
+  :root{--ink:#1F2A37;--muted:#667085;--accent:#2F5597;--accent-soft:#EAF1FB;--band:#2A7F77;--border:#D7DEE8;--soft:#F4F6F8;--ok:#1F7A4D;--ok-bg:#E7F4EA;--warn:#8A6100;--warn-bg:#FFF4CC;--bad:#B42318;--bad-bg:#FCE4E4;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Segoe UI",Calibri,Arial,sans-serif;color:var(--ink);font-size:14px;background:#eef1f6;}
+  header{background:linear-gradient(90deg,#24518f,#2A7F77);color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+  header h1{font-size:20px;} .sub{font-size:12px;opacity:.9;margin-top:3px;}
+  .hdr-actions{display:flex;gap:8px;}
+  .hbtn{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.45);color:#fff;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
+  .hbtn:hover{background:rgba(255,255,255,.3);}
+  .wrap{max-width:1100px;margin:0 auto;padding:20px;}
+  nav.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;}
+  nav.tabs button{background:#fff;border:1px solid var(--border);color:var(--ink);padding:10px 18px;border-radius:8px;font-size:15px;cursor:pointer;font-weight:600;}
+  nav.tabs button.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .panel{display:none;} .panel.active{display:block;}
+  .card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;}
+  .card h2{font-size:16px;margin-bottom:12px;color:var(--accent);}
+  .muted{color:var(--muted);font-size:12px;}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field label{font-size:12px;color:var(--muted);font-weight:600;}
+  input,select{font-size:14px;padding:9px 12px;border:1px solid var(--border);border-radius:6px;}
+  button.btn{background:var(--accent);color:#fff;border:none;padding:10px 16px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;}
+  button.btn.ghost{background:#fff;color:var(--accent);border:1px solid var(--accent);}
+  button.btn.sm{padding:6px 10px;font-size:12px;}
+  button.btn.danger{background:var(--bad);}
+  table{width:100%;border-collapse:collapse;background:#fff;font-size:13px;}
+  th{background:var(--accent);color:#fff;text-align:left;padding:9px 10px;font-size:12px;}
+  td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
+  .row-warn{background:#FFF7E0!important;}
+  .tag{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;}
+  .tag.ok{background:var(--ok-bg);color:var(--ok);}
+  .tag.warn{background:var(--warn-bg);color:var(--warn);}
+  .scroll{overflow:auto;max-height:480px;border:1px solid var(--border);border-radius:8px;}
+  .empty{padding:24px;text-align:center;color:var(--muted);}
+  .a4{width:210mm;min-height:297mm;background:#fff;color:#000;padding:13mm 15mm;margin:0 auto 24px;box-shadow:0 2px 10px rgba(0,0,0,.14);font-size:12px;}
+  .a4 .org{text-align:center;font-weight:700;font-size:13px;}
+  .a4 h4{text-align:center;font-weight:700;text-transform:uppercase;font-size:13px;margin:6px 0 2px;}
+  .a4 .csub{text-align:center;font-size:11px;margin-bottom:8px;}
+  .a4 table{border-collapse:collapse;width:100%;font-size:11px;margin-top:6px;}
+  .a4 td,.a4 th{border:1px solid #000;padding:4px 6px;vertical-align:top;text-align:left;}
+  .a4 th{background:#eef2f7;color:#000;}
+  .a4 .sec{font-weight:700;font-size:12px;margin:12px 0 2px;}
+  .a4 .sig{display:flex;justify-content:space-between;gap:20px;margin-top:18px;font-size:11px;}
+  .a4 .sig .lbl{font-size:10px;opacity:.7;}
+  .cards-tool{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  /* Обложка */
+  #cover{position:fixed;inset:0;z-index:100;background:linear-gradient(135deg,#1c3d6b 0%,#2A7F77 100%);color:#fff;display:flex;align-items:center;justify-content:center;overflow:auto;}
+  #cover.hide{display:none;}
+  .cover-in{max-width:620px;text-align:center;padding:36px 24px;}
+  .cover-title{font-size:40px;font-weight:800;letter-spacing:2px;}
+  .cover-sub{font-size:18px;opacity:.95;margin-top:8px;}
+  .cover-pass{margin-top:24px;display:block;width:min(320px,80vw);margin-left:auto;margin-right:auto;padding:14px 18px;border-radius:24px;border:2px solid rgba(255,255,255,.7);background:rgba(255,255,255,.16);color:#fff;font-size:16px;text-align:center;letter-spacing:2px;outline:none;}
+  .cover-pass::placeholder{color:rgba(255,255,255,.75);}
+  .cover-btn{margin-top:20px;background:#fff;color:#1c3d6b;font-weight:700;padding:14px 44px;border-radius:30px;font-size:16px;border:none;cursor:pointer;}
+  .cover-err{color:#ffd2d2;font-size:13px;margin-top:10px;min-height:18px;font-weight:600;}
+  .cover-foot{position:sticky;bottom:20px;text-align:center;font-size:12px;opacity:.6;padding:8px 0;}
+  @media(max-width:860px){
+    header .hbtn{display:none;} header #logout_btn{display:inline-block;}
+    .wrap{padding:12px;} nav.tabs button{padding:12px 14px;font-size:15px;}
+    input,select{font-size:16px;} .btn{padding:12px 16px;font-size:15px;}
+  }
+  @media print{ body *{visibility:hidden;} #cardsArea,#cardsArea *{visibility:visible;} #cardsArea{position:absolute;left:0;top:0;width:100%;} .a4{box-shadow:none;margin:0;} }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div>
+      <h1>УК КОНТИНЕНТ · ДИСПЕТЧЕР</h1>
+      <div class="sub">Карточки СИЗ и план задач инженера</div>
+    </div>
+  </div>
+  <div class="hdr-actions">
+    <button class="hbtn" id="refresh_btn" title="Обновить данные">Обновить</button>
+    <button class="hbtn" id="logout_btn" title="Выйти">Выйти</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="tabs" id="tabs">
+    <button data-tab="cards" class="active">Карточки СИЗ</button>
+    <button data-tab="eng">Инженер · задачи</button>
+  </nav>
+
+  <!-- Карточки СИЗ -->
+  <section class="panel active" id="plcards">
+    <div class="card">
+      <h2>Личные карточки учёта выдачи СИЗ</h2>
+      <div class="cards-tool">
+        <div class="field"><label>Работник</label><select id="cw_sel"></select></div>
+        <label style="display:inline-flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="cw_all"> Все работники</label>
+        <button class="btn" id="cw_print">Печать</button>
+        <button class="btn ghost" id="cw_word">Скачать в Word</button>
+      </div>
+      <div class="muted" style="margin-top:8px">Форма личной карточки учёта выдачи средств индивидуальной защиты (приказ Минтруда № 766н).</div>
+    </div>
+    <div id="cardsArea"></div>
+  </section>
+
+  <!-- Инженер -->
+  <section class="panel" id="pleng">
+    <div class="card">
+      <h2>План задач инженера</h2>
+      <div class="muted" style="margin-bottom:8px">Диспетчер может поставить задачу инженеру на сегодня или другой день. Задачи сохраняются в облаке и видны на ПК инженера.</div>
+      <div class="toolbar">
+        <div class="field"><label>Дата</label><input type="date" id="eng_date"></div>
+        <div class="field"><label>Время</label><input type="time" id="eng_time"></div>
+        <div class="field"><label>Задача</label><input id="eng_text" placeholder="Что нужно сделать" style="min-width:220px"></div>
+        <button class="btn" id="eng_add">Отправить задачу</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Задачи на выбранный день</h2>
+      <div class="scroll"><table id="eng_tbl"></table></div>
+    </div>
+  </section>
+</div>
+
+<!-- Обложка -->
+<div id="cover">
+  <div class="cover-in">
+    <div class="cover-title">КОНТИНЕНТ</div>
+    <div class="cover-sub">Диспетчер</div>
+    <input type="password" id="cover_pass" class="cover-pass" placeholder="Введите пароль" autocomplete="off">
+    <button class="cover-btn" id="cover_enter">Войти</button>
+    <div class="cover-err" id="cover_err"></div>
+  </div>
+  <div class="cover-foot">УК «Континент» · Диспетчерская служба</div>
+</div>
+
+<script>
+"use strict";
+const LS_KEY="uk_kontinent_uchet_v1";
+const AUTH_PASS="252525";
+const GH={owner:"ip7993532-arch",repo:"uk-kontinent-uchet",branch:"main",file:"data.json",tokenKey:"uk_kon_gh_token"};
+const API="https://api.github.com/repos/"+GH.owner+"/"+GH.repo;
+const RAW="https://raw.githubusercontent.com/"+GH.owner+"/"+GH.repo+"/"+GH.branch+"/"+GH.file;
+let ghSyncBusy=false, ghQueued=false;
+function ghToken(){try{const l=localStorage.getItem(GH.tokenKey);if(l)return l;}catch(e){}return ["ghp_","uQ5E8HWRGM5ASUfHR9NBkEoGs1WKuL0M","GnLo"].join("");}
+function ghAuth(){return {Authorization:"token "+ghToken()};}
+function ghAuthed(){return !!ghToken();}
+function ghHeaders(){return {"Accept":"application/vnd.github.v3+json","Content-Type":"application/json"};}
+async function ghRead(){
+  try{const r=await fetch(RAW,{cache:"no-store"});if(r.ok){const t=await r.text();if(t&&t.trim())return JSON.parse(t);}}catch(e){}
+  try{const r=await fetch(API+"/contents/"+GH.file+"?ref="+GH.branch,{headers:Object.assign(ghAuth(),ghHeaders())});if(r.ok){const j=await r.json();if(j&&j.content)return JSON.parse(decodeURIComponent(escape(atob(j.content.replace(/\s/g,"")))));}}catch(e){}
+  return null;
+}
+async function ghWrite(blob){
+  if(!ghAuthed())return;
+  if(ghSyncBusy){ghQueued=true;return;}
+  ghSyncBusy=true;
+  try{
+    let sha=null,remote=null;
+    try{const meta=await(await fetch(API+"/contents/"+GH.file+"?ref="+GH.branch,{headers:Object.assign(ghAuth(),ghHeaders())})).json();if(meta.sha)sha=meta.sha;if(meta.content)remote=JSON.parse(decodeURIComponent(escape(atob(meta.content.replace(/\s/g,"")))));}catch(e){}
+    const out=blob.s?JSON.parse(JSON.stringify(blob.s)):{workers:[],items:[],tx:[]};
+    if(!Array.isArray(out.requests))out.requests=[];
+    if(!Array.isArray(out.deletedRequests))out.deletedRequests=[];
+    const del=Object.create(null);out.deletedRequests.forEach(id=>del[id]=1);
+    out.requests=out.requests.filter(r=>!del[r.id]);
+    const rm=remote&&remote.s?norm(remote.s):null;
+    if(rm&&rm.requests){if(Array.isArray(rm.deletedRequests)){rm.deletedRequests.forEach(id=>{del[id]=1;if(!out.deletedRequests.includes(id))out.deletedRequests.push(id);});}rm.requests.forEach(rr=>{if(!del[rr.id]&&!out.requests.some(x=>x.id===rr.id))out.requests.push(rr);});}
+    out.requests=out.requests.filter(r=>!del[r.id]);
+    if(!Array.isArray(out.engTasks))out.engTasks=[];
+    const dt={};out.engTasks.forEach(t=>{if(t&&t.deleted)dt[t.id]=1;});
+    if(rm&&rm.engTasks){rm.engTasks.forEach(rt=>{if(rt&&rt.deleted)dt[rt.id]=1;const ex=out.engTasks.find(x=>x.id===rt.id);if(ex){if(rt.done!==undefined)ex.done=rt.done;ex.deleted=!!rt.deleted;}else if(!rt.deleted)out.engTasks.push(rt);});}
+    out.engTasks=out.engTasks.filter(t=>!dt[t.id]&&!t.deleted);
+    if(rm&&rm.needs){for(let i=0;i<out.needs.length;i++){const tgt=out.needs[i];rm.needs[i]&&rm.needs[i].rows&&rm.needs[i].rows.forEach(rr=>{if(!tgt.rows.some(x=>x.name===rr.name&&x.art===rr.art&&x.qty===rr.qty))tgt.rows.push(rr);});}}
+    const payload={s:out,ts:Date.now()};
+    const enc=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+    const body={message:"Автосохранение",content:enc,branch:GH.branch};if(sha)body.sha=sha;
+    const r=await fetch(API+"/contents/"+GH.file,{method:"PUT",headers:Object.assign(ghAuth(),ghHeaders()),body:JSON.stringify(body)});
+    if(!r.ok)console.warn("ghWrite",r.status);else{state=out;}
+  }catch(e){console.warn(e);}
+  ghSyncBusy=false;
+  if(ghQueued){ghQueued=false;ghWrite({s:state,ts:Date.now()});}
+}
+async function syncPull(){
+  const remote=await ghRead();
+  if(!remote||!remote.s||!remote.s.workers||!remote.s.items||!remote.s.tx)return false;
+  const rc=norm(remote.s);
+  const dt={};(state.engTasks||[]).forEach(t=>{if(t&&t.deleted)dt[t.id]=1;});(rc.engTasks||[]).forEach(t=>{if(t&&t.deleted)dt[t.id]=1;});
+  (state.engTasks||[]).forEach(lt=>{if(!lt||lt.deleted||dt[lt.id])return;const ex=rc.engTasks.find(x=>x.id===lt.id);if(!ex)rc.engTasks.push(lt);else{if(lt.done!==undefined)ex.done=lt.done;}});
+  rc.engTasks=rc.engTasks.filter(t=>!dt[t.id]&&!t.deleted);
+  const hasLocal=rc.workers.length||rc.items.length;
+  if(hasLocal){state=rc;return true;}
+  return false;
+}
+function norm(s){s=s||{};if(!Array.isArray(s.workers))s.workers=[];if(!Array.isArray(s.items))s.items=[];if(!Array.isArray(s.tx))s.tx=[];if(!Array.isArray(s.requests))s.requests=[];if(!Array.isArray(s.deletedRequests))s.deletedRequests=[];if(!Array.isArray(s.engTasks))s.engTasks=[];if(!Array.isArray(s.needs))s.needs=[];return s;}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function today(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function fmtDate(iso){if(!iso)return"—";const[x,y,z]=iso.split("-");return z+"."+y+"."+x;}
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+function worker(id){return state.workers.find(w=>w.id===id);}
+function item(id){return state.items.find(i=>i.id===id);}
+let state=norm();
+function load(){try{const raw=localStorage.getItem(LS_KEY);if(raw)state=norm(JSON.parse(raw));}catch(e){}}
+function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(state));}catch(e){}clearTimeout(_st);_st=setTimeout(()=>ghWrite({s:state,ts:Date.now()}),400);}
+let _st=null;
+function loadFromHash(){}
+
+// ---------- Auth ----------
+function authKeyLocal(){return "uk_kon_dispatcher_auth";}
+function isAuthed(){try{return localStorage.getItem(authKeyLocal())==="1";}catch(e){return false;}}
+function setAuthed(v){try{localStorage.setItem(authKeyLocal(),v?"1":"0");}catch(e){}}
+document.getElementById("cover_enter").addEventListener("click",enterApp);
+document.getElementById("cover_pass").addEventListener("keydown",e=>{if(e.key==="Enter")enterApp();});
+async function enterApp(){
+  const pass=document.getElementById("cover_pass").value;
+  if(pass!==AUTH_PASS){document.getElementById("cover_err").textContent="Неверный пароль.";document.getElementById("cover_pass").value="";return;}
+  setAuthed(true);
+  await syncPull();
+  document.getElementById("cover").classList.add("hide");
+  renderCards(); renderEng();
+}
+document.getElementById("logout_btn").addEventListener("click",()=>{if(confirm("Выйти?")){setAuthed(false);location.reload();}});
+document.getElementById("refresh_btn").addEventListener("click",async()=>{await syncPull();save();renderCards();renderEng();});
+if(isAuthed()){document.getElementById("cover").classList.add("hide");}
+
+// ---------- Tabs ----------
+document.getElementById("tabs").addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b)return;
+  document.querySelectorAll("nav#tabs button").forEach(x=>x.classList.toggle("active",x===b));
+  document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
+  document.getElementById("pl"+b.dataset.tab).classList.add("active");
+  if(b.dataset.tab==="cards")renderCards();
+  if(b.dataset.tab==="eng")renderEng();
+});
+
+// ---------- Карточки СИЗ ----------
+function parseD(s){const[x,y,z]=String(s||"").split("-").map(Number);return new Date(x,y-1,z);}
+function wearPct(it,lastOutIso){
+  if(!lastOutIso||!it||!it.months)return"";
+  const used=Date.now()-parseD(lastOutIso).getTime();
+  const total=Number(it.months)*30;let p=Math.round(used/86400000/total*100);if(p>100)p=100;if(p<0)p=0;return p+"%";
+}
+function cardHTML(w){
+  const itemsRow=state.items.map((it,idx)=>"<tr><td>"+(idx+1)+"</td><td>"+esc(it.name)+"</td><td>"+esc(it.type)+"</td><td>"+it.qty+"</td><td>"+it.months+" мес.</td></tr>").join("");
+  const txs=state.tx.filter(t=>t.workerId===w.id);
+  let txRows=txs.map(t=>{const it=item(t.itemId);return t.kind==="Выдача"
+    ?"<tr><td>"+esc(it?it.name:"?")+"</td><td>"+esc(it?it.type:"")+"</td><td>"+fmtDate(t.date)+"</td><td>"+t.qty+"</td><td>0%</td><td></td><td></td><td></td></tr>"
+    :"<tr><td>"+esc(it?it.name:"?")+"</td><td>"+esc(it?it.type:"")+"</td><td></td><td></td><td></td><td>"+fmtDate(t.date)+"</td><td>"+t.qty+"</td><td></td></tr>";}).join("");
+  return '<div class="a4"><div class="org">Управляющая компания «КОНТИНЕНТ»</div>'+
+    '<h4>Личная карточка учёта выдачи средств индивидуальной защиты</h4>'+
+    '<div class="csub">Карточка № '+(w.tab||"____")+'</div>'+
+    '<table><tr><td style="width:28%"><b>Фамилия, имя, отчество</b></td><td colspan="3">'+esc(w.name)+'</td></tr>'+
+    '<tr><td><b>Табельный номер</b></td><td>'+esc(w.tab||"—")+'</td><td style="width:14%"><b>Пол</b></td><td>'+esc(w.sex||"—")+'</td></tr>'+
+    '<tr><td><b>Рост</b></td><td>'+esc(w.hrota||"—")+'</td><td><b>Размер одежды</b></td><td>'+esc(w.sz_ap||"—")+'</td></tr>'+
+    '<tr><td><b>Размер обуви</b></td><td>'+esc(w.sz_sh||"—")+'</td><td><b>Размер перчаток</b></td><td>'+esc(w.sz_gl||"—")+'</td></tr>'+
+    '<tr><td><b>Размер головного убора</b></td><td>'+esc(w.sz_hd||"—")+'</td><td><b>Дата приёма</b></td><td>'+fmtDate(w.hire)+'</td></tr>'+
+    '<tr><td><b>Должность</b></td><td colspan="3">'+esc(w.post||"—")+'</td></tr>'+
+    '<tr><td><b>Подразделение</b></td><td colspan="3">'+esc(w.dept||"—")+'</td></tr></table>'+
+    '<div class="sec">1. Перечень СИЗ по нормам выдачи</div>'+
+    '<table><tr><th style="width:34px">№</th><th>Наименование</th><th>Тип</th><th>Норма</th><th>Срок</th></tr>'+(state.items.length?itemsRow:'<tr><td colspan="5">Номенклатура не заполнена.</td></tr>')+'</table>'+
+    '<div class="sec">2. Выдано и возвращено</div>'+
+    '<table><tr><th>Наименование</th><th>Тип</th><th>Дата выдачи</th><th>Выдано</th><th>% износа</th><th>Дата возврата</th><th>Возвращено</th><th>% износа</th></tr>'+(txRows||'<tr><td colspan="8">Операций нет.</td></tr>')+'</table>'+
+    '<div class="sig"><div><b>Ответственный за выдачу СИЗ:<br>Назиров И.Е.</b><br><span class="lbl">____________________ (________) ______</span><br><span class="lbl">подпись</span></div>'+
+    '<div><b>Руководитель:<br>Шлеин П.С.</b><br><span class="lbl">____________________ (________) ______</span><br><span class="lbl">подпись</span></div></div>'+
+    '<div class="csub" style="margin-top:16px">Форма по приказу Минтруда РФ от 29.10.2021 № 766н</div></div>';
+}
+function renderCards(){
+  const sel=document.getElementById("cw_sel");const prev=sel.value;sel.length=0;
+  const all=document.createElement("option");all.value="__all";all.textContent="— все —";sel.appendChild(all);
+  state.workers.forEach(w=>{const o=document.createElement("option");o.value=w.id;o.textContent=w.name+(w.post&&w.post!=="—"?(" ("+w.post+")"):"");sel.appendChild(o);});
+  if(prev&&[...sel.options].some(o=>o.value===prev))sel.value=prev;
+  const area=document.getElementById("cardsArea");
+  if(!state.workers.length){area.innerHTML='<div class="empty">Работников пока нет.</div>';return;}
+  const cb=document.getElementById("cw_all");
+  const list=cb.checked||sel.value==="__all"?state.workers.slice():(sel.value?state.workers.filter(w=>w.id===sel.value):[state.workers[0]]);
+  area.innerHTML=list.map(cardHTML).join("");
+}
+document.getElementById("cw_sel").addEventListener("change",renderCards);
+document.getElementById("cw_all").addEventListener("change",renderCards);
+document.getElementById("cw_print").addEventListener("click",()=>window.print());
+document.getElementById("cw_word").addEventListener("click",()=>{renderCards();const list=document.getElementById("cardsArea");downloadDoc("lichnye_kartochki_siz_"+today(),list.innerHTML.replace(/<br>/g,"<br>").split("</div>").map(s=>s+"</div>").join('<div style="page-break-after:always"></div>'));});
+
+// ---------- Инженер: задачи ----------
+function renderEng(){
+  const d=document.getElementById("eng_date");if(!d)return;if(!d.value)d.value=today();
+  const sel=d.value;
+  const t=document.getElementById("eng_tbl");
+  const list=state.engTasks.filter(x=>!x.deleted&&x.date===sel).sort((a,b)=>(a.time||"").localeCompare(b.time||""));
+  if(!list.length){t.innerHTML='<div class="empty">Задач на этот день нет.</div>';return;}
+  t.innerHTML="<thead><tr><th>Время</th><th>Задача</th><th>Статус</th><th></th></tr></thead><tbody>"+
+    list.map((x,xi)=>{const st=x.done?"<span class='tag ok'>Выполнено</span>":"<span class='tag warn'>В работе</span>";
+    return "<tr"+(x.done?" style='opacity:.6'":"")+"><td>"+esc(x.time||"—")+"</td><td>"+esc(x.text)+"</td><td>"+st+"</td>"+
+      '<td class="action-row"><button class="btn sm danger" data-eng="del" data-idx="'+xi+'" data-date="'+sel+'">Уд.</button></td></tr>';}).join("")+"</tbody>";
+  t.querySelectorAll("[data-eng]").forEach(b=>b.onclick=()=>{
+    const idx=+b.dataset.idx;const dd=b.dataset.date;
+    const same=state.engTasks.filter(x=>!x.deleted&&x.date===dd);
+    const x=same[idx];if(!x)return;
+    if(b.dataset.eng==="del"){if(confirm("Удалить задачу?")){x.deleted=true;}}
+    save();renderEng();
+  });
+}
+document.getElementById("eng_add").addEventListener("click",()=>{
+  const d=document.getElementById("eng_date").value||today();
+  const tm=document.getElementById("eng_time").value;
+  const tx=document.getElementById("eng_text").value.trim();
+  if(!tx){alert("Введите задачу");return;}
+  state.engTasks.push({id:uid(),date:d,time:tm,text:tx,done:false,by:"Диспетчер"});
+  save();renderEng();
+  document.getElementById("eng_text").value="";document.getElementById("eng_time").value="";
+});
+
+// ---------- Word ----------
+function downloadDoc(name,html){
+  const doc='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xml:lang="ru"><head><meta charset="utf-8"><style>body{font-family:"Times New Roman",serif;font-size:15px;}.a4 h4{text-align:center;}.a4 table{border-collapse:collapse;width:100%;font-size:13px;}.a4 td,.a4 th{border:1px solid #000;padding:5px 8px;}</style></head><body>'+html+'</body></html>';
+  const b=new Blob(["\uFEFF"+doc],{type:"application/msword"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=name+".doc";a.click();URL.revokeObjectURL(a.href);
+}
+
+// ---------- Init ----------
+load(); loadFromHash();
+window.addEventListener("online",()=>renderCards());
+window.addEventListener("offline",()=>renderCards());
+if(isAuthed()){syncPull().then(ok=>{if(ok){save();renderCards();renderEng();}});}
+</script>
+</body>
+</html>
