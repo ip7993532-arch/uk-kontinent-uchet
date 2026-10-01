@@ -333,6 +333,17 @@ async function syncPull(){
   const remote=await ghRead();
   if(!remote||!remote.s||!remote.s.workers||!remote.s.items||!remote.s.tx)return false;
   const rc=normalizeState(remote.s);
+  // объединяем потребности: локальные позиции, которых нет в облаке, не теряем
+  for(let i=0;i<state.needs.length;i++){
+    const lrows=state.needs[i]?state.needs[i].rows:[];
+    const target=rc.needs[i];
+    if(!target)continue;
+    lrows.forEach(lr=>{
+      if(!target.rows.some(r=>r.name===lr.name&&r.art===lr.art&&r.qty===lr.qty)){
+        target.rows.push(lr);
+      }
+    });
+  }
   const hasLocal=state.workers.length||state.items.length||state.tx.length;
   const hasRemote=rc.workers.length||rc.items.length||rc.tx.length;
   if(hasRemote||!hasLocal){state=rc; return true;}
