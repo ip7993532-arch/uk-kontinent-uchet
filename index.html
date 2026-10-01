@@ -430,6 +430,17 @@ function dueDate(itemId,acc){
 // ---------- Потребности по профессиям ----------
 const NEED_SLOTS=[{name:"Слесарь",key:"Слесарь"},{name:"Водитель",key:"Водитель"},{name:"Мастер участка",key:"Мастер участка"}];
 function needSlot(i){return state.needs[i]||{name:NEED_SLOTS[i]?NEED_SLOTS[i].name:"—",rows:[]};}
+// поиск работника из общей базы по должности (для поля «От кого»)
+function needAuthor(slotName){
+  const k=String(slotName||"").toLowerCase();
+  const needles=k.indexOf("мастер")>=0?["мастер"]:k.indexOf("водител")>=0?["водител","водитель"]:k.indexOf("слесар")>=0?["слесар"]:[k];
+  const hit=state.workers.find(w=>{
+    const p=String(w.post||"").toLowerCase();
+    if(!p||p==="—")return false;
+    return needles.some(n=>p.indexOf(n)>=0);
+  });
+  return hit?hit.name:"";
+}
 function renderNeeds(){
   const area=document.getElementById("needs_area"); if(!area)return;
   area.innerHTML=state.needs.map((slot,si)=>{
@@ -503,9 +514,14 @@ function renderNeeds(){
     const si=+b.dataset.si, slot=state.needs[si];
     const rows=(slot.rows||[]).map(r=>[r.name,r.art||"",r.qty||"",(r.price===""||r.price==null)?(r.price||""):String(r.price)]);
     if(!rows.length){alert("Слот пуст — сначала добавьте позиции.");return;}
+    const author=needAuthor(slot.name);
     const h="<div class='org'>Управляющая компания «КОНТИНЕНТ»</div>"+
       "<h2 style='text-align:center'>Потребности — "+esc(slot.name)+"</h2>"+
-      "<p style='text-align:center;font-size:11px'>Документ сформирован "+fmtDate(today())+"</p>";
+      "<p style='text-align:center;font-size:11px'>Документ сформирован "+fmtDate(today())+"</p>"+
+      "<table class='t' style='margin-top:12px;width:100%;border-collapse:collapse'>"+
+        "<tr><td style='border:none;padding:2px 6px'><b>Кому:</b> Шлеин П.С., руководитель</td></tr>"+
+        "<tr><td style='border:none;padding:2px 6px'><b>От кого:</b> "+(author?esc(author):"_________________")+" ("+esc(slot.name)+")</td></tr>"+
+      "</table><br>";
     downloadDoc("potrebnosti_"+slug(slot.name)+"_"+today(), h+wordTable("",["Позиция","Артикул","Кол-во","Цена, ₽"],rows));
   });
 }
