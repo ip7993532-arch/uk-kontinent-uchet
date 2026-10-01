@@ -435,30 +435,36 @@ function renderNeeds(){
   area.innerHTML=state.needs.map((slot,si)=>{
     const rows=slot.rows||[];
     const tbody=rows.length?rows.map((r,ri)=>
-      "<tr><td>"+esc(r.name)+"</td><td>"+(r.qty||"")+"</td><td>"+esc(r.note||"")+"</td>"+
+      "<tr><td>"+esc(r.name)+"</td><td>"+esc(r.art||"")+"</td><td>"+(r.qty||"")+"</td><td>"+((r.price===""||r.price==null)?"":(esc(String(r.price))))+"</td>"+
       '<td class="action-row"><button class="btn sm danger" data-need="del" data-si="'+si+'" data-ri="'+ri+'">Уд.</button></td></tr>'
-    ).join(""):'<tr><td colspan="4" class="empty">Пусто — добавьте позиции.</td></tr>';
+    ).join(""):'<tr><td colspan="5" class="empty">Пусто — добавьте позиции.</td></tr>';
     return '<div class="card">'+
       '<div class="flex" style="justify-content:space-between;align-items:center"><h2 style="margin-bottom:0">Потребности — '+esc(slot.name)+'</h2>'+
       '<div class="action-row"><button class="btn sm ghost" data-need="print" data-si="'+si+'" title="Печать">Печать</button>'+
       '<button class="btn sm" data-need="word" data-si="'+si+'">Скачать в Word</button></div></div>'+
       '<div class="toolbar" style="margin-top:10px">'+
         '<div class="field"><label>Позиция</label><input data-need="name" data-si="'+si+'" placeholder="Наименование"></div>'+
+        '<div class="field"><label>Артикул</label><input data-need="art" data-si="'+si+'" placeholder="Код" style="width:110px"></div>'+
         '<div class="field"><label>Кол-во</label><input data-need="qty" data-si="'+si+'" placeholder="шт." style="width:70px"></div>'+
-        '<div class="field"><label>Примечание</label><input data-need="note" data-si="'+si+'" placeholder="—" style="width:140px"></div>'+
+        '<div class="field"><label>Цена, ₽</label><input data-need="price" data-si="'+si+'" placeholder="0,00" style="width:90px"></div>'+
         '<button class="btn" data-need="add" data-si="'+si+'">Добавить</button>'+
       '</div>'+
-      '<div class="scroll"><table><thead><tr><th>Позиция</th><th style="width:70px">Кол-во</th><th>Примечание</th><th style="width:60px"></th></tr></thead><tbody>'+tbody+'</tbody></table></div>'+
+      '<div class="scroll"><table><thead><tr><th>Позиция</th><th style="width:110px">Артикул</th><th style="width:70px">Кол-во</th><th style="width:90px">Цена, ₽</th><th style="width:60px"></th></tr></thead><tbody>'+tbody+'</tbody></table></div>'+
     '</div>';
   }).join("");
   area.querySelectorAll("[data-need='add']").forEach(b=>b.onclick=()=>{
     const si=+b.dataset.si;
     const nm=area.querySelector('[data-need="name"][data-si="'+si+'"]').value.trim();
+    const ar=area.querySelector('[data-need="art"][data-si="'+si+'"]').value.trim();
     const qy=area.querySelector('[data-need="qty"][data-si="'+si+'"]').value.trim();
-    const nt=area.querySelector('[data-need="note"][data-si="'+si+'"]').value.trim();
+    const pr=area.querySelector('[data-need="price"][data-si="'+si+'"]').value.trim();
     if(!nm){alert("Укажите наименование позиции");return;}
-    state.needs[si].rows.push({name:nm,qty:qy,note:nt});
+    state.needs[si].rows.push({name:nm,art:ar,qty:qy,price:pr});
     save(); renderNeeds();
+    area.querySelector('[data-need="name"][data-si="'+si+'"]').value="";
+    area.querySelector('[data-need="art"][data-si="'+si+'"]').value="";
+    area.querySelector('[data-need="qty"][data-si="'+si+'"]').value="";
+    area.querySelector('[data-need="price"][data-si="'+si+'"]').value="";
   });
   area.querySelectorAll("[data-need='del']").forEach(b=>b.onclick=()=>{
     const si=+b.dataset.si,ri=+b.dataset.ri;
@@ -473,12 +479,12 @@ function renderNeeds(){
   });
   area.querySelectorAll("[data-need='word']").forEach(b=>b.onclick=()=>{
     const si=+b.dataset.si, slot=state.needs[si];
-    const rows=(slot.rows||[]).map(r=>[r.name,r.qty||"",r.note||""]);
+    const rows=(slot.rows||[]).map(r=>[r.name,r.art||"",r.qty||"",(r.price===""||r.price==null)?(r.price||""):String(r.price)]);
     if(!rows.length){alert("Слот пуст — сначала добавьте позиции.");return;}
     const h="<div class='org'>Управляющая компания «КОНТИНЕНТ»</div>"+
       "<h2 style='text-align:center'>Потребности — "+esc(slot.name)+"</h2>"+
       "<p style='text-align:center;font-size:11px'>Документ сформирован "+fmtDate(today())+"</p>";
-    downloadDoc("potrebnosti_"+slug(slot.name)+"_"+today(), h+wordTable("",["Позиция","Кол-во","Примечание"],rows));
+    downloadDoc("potrebnosti_"+slug(slot.name)+"_"+today(), h+wordTable("",["Позиция","Артикул","Кол-во","Цена, ₽"],rows));
   });
 }
 function slug(s){return String(s||"").toLowerCase().replace(/[^a-zа-яё0-9]+/gi,"-").replace(/^-+|-+$/g,"")||"slot";}
