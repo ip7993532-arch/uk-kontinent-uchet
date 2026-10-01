@@ -359,10 +359,13 @@ async function ghWrite(blob){
       if(meta.content)remote=JSON.parse(decodeURIComponent(escape(atob(meta.content.replace(/\s/g,"")))));
     }catch(e){}
     const out=blob.s?JSON.parse(JSON.stringify(blob.s)):(blob&&blob.s?blob.s:{workers:[],items:[],tx:[]});
-    // объединение заявок (union по id — чужие не теряются)
+    // объединение заявок (union по id — чужие не теряются; удалённые не восстанавливаются)
+    if(!Array.isArray(out.requests))out.requests=[];
+    const deletedIds={}; out.requests.forEach(r=>{if(r&&r.deleted)deletedIds[r.id]=1;});
+    out.requests=out.requests.filter(r=>!r.deleted);
     const rm=remote&&remote.s?normalizeState(remote.s):null;
     if(rm&&rm.requests){
-      rm.requests.forEach(rr=>{ if(!out.requests.some(x=>x.id===rr.id))out.requests.push(rr); });
+      rm.requests.forEach(rr=>{ if(!rr.deleted&&!deletedIds[rr.id]&&!out.requests.some(x=>x.id===rr.id))out.requests.push(rr); });
     }
     // объединение потребностей (строки из облака, которых нет локально)
     if(rm&&rm.needs){for(let i=0;i<out.needs.length;i++){const tgt=out.needs[i];rm.needs[i]&&rm.needs[i].rows&&rm.needs[i].rows.forEach(rr=>{if(!tgt.rows.some(x=>x.name===rr.name&&x.art===rr.art&&x.qty===rr.qty))tgt.rows.push(rr);});}}
@@ -394,9 +397,11 @@ async function syncPull(){
       }
     });
   }
-  // объединяем заявки (не теряем ни из облака, ни локальные)
+  // объединяем заявки (не теряем ни из облака, ни локальные; удалённые убираем)
+  const localDel={}; state.requests.forEach(lr=>{if(lr&&lr.deleted)localDel[lr.id]=1;});
+  rc.requests=rc.requests.filter(r=>!r.deleted&&!localDel[r.id]);
   state.requests.forEach(lr=>{
-    if(!rc.requests.some(r=>r.id===lr.id))rc.requests.push(lr);
+    if(!lr.deleted&&!rc.requests.some(r=>r.id===lr.id))rc.requests.push(lr);
   });
   const hasLocal=state.workers.length||state.items.length||state.tx.length;
   const hasRemote=rc.workers.length||rc.items.length||rc.tx.length;
@@ -654,7 +659,7 @@ function renderRequests(){
     else{
       const mt=document.getElementById("rq_mine_tbl");
       const meId=ws.value;
-      const mineList=state.requests.slice().filter(r=>r.fromId===meId).sort((a,b)=>(b.ts||0)-(a.ts||0));
+      const mineList=state.requests.slice().filter(r=>!r.deleted&&r.fromId===meId).sort((a,b)=>(b.ts||0)-(a.ts||0));
       if(!mineList.length){mt.innerHTML='<div class="empty">Вы ещё не отправляли заявки.</div>';}
       else mt.innerHTML="<thead><tr><th>Дата</th><th>Потребность</th><th>Кол-во</th><th>Статус</th><th></th></tr></thead><tbody>"+
         mineList.map(r=>{
@@ -663,16 +668,14 @@ function renderRequests(){
             '<td><button class="btn sm danger" data-rq="mdel" data-id="'+r.id+'">Уд.</button></td></tr>';
         }).join("")+"</tbody>";
       mt.querySelectorAll("[data-rq='mdel']").forEach(b=>b.onclick=()=>{
-        if(confirm("Удалить свою заявку?")){state.requests=state.requests.filter(x=>x.id!==b.dataset.id);save();renderRequests();}
+        if(confirm("Удалить свою заявку?")){const r=state.requests.find(x=>x.id===b.dataset.id);if(r)r.deleted=true;save();renderRequests();alert("Заявка удалена.");}
       });
     }
     return;
   }
   // журнал заявок на ПК — только заявки от мастеров участка, новые сверху
   const t=document.getElementById("rq_tbl");
-  const list=state.requests.slice().filter(r=>{
-    const w=worker(r.fromId); return isMaster(w)||String(r.fromName||"").toLowerCase().indexOf("мастер")>=0;
-  }).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const list=state.requests.slice().filter(r=>!r.deleted&&(isMaster(worker(r.fromId))||String(r.fromName||"").toLowerCase().indexOf("мастер")>=0)).sort((a,b)=>(b.ts||0)-(a.ts||0));
   if(!list.length){t.innerHTML='<div class="empty">Заявок пока нет.</div>';}
   else t.innerHTML="<thead><tr><th>Дата</th><th>От кого</th><th>Потребность</th><th>Кол-во</th><th>Откуда</th><th>Примечание</th><th>Статус</th><th></th></tr></thead><tbody>"+
     list.map(r=>{
@@ -688,7 +691,7 @@ function renderRequests(){
     r.approved=true; r.approvedAt=today(); save(); renderRequests();
   });
   t.querySelectorAll("[data-rq='del']").forEach(b=>b.onclick=()=>{
-    if(confirm("Удалить заявку?")){state.requests=state.requests.filter(x=>x.id!==b.dataset.id);save();renderRequests();}
+    if(confirm("Удалить заявку?")){const r=state.requests.find(x=>x.id===b.dataset.id);if(r)r.deleted=true;save();renderRequests();}
   });
 }
 function isMobile(){
@@ -742,8 +745,11 @@ function ghWriteDirect(blob){
         if(meta.content)remote=JSON.parse(decodeURIComponent(escape(atob(meta.content.replace(/\s/g,"")))));
       }catch(e){}
       const out=blob.s?JSON.parse(JSON.stringify(blob.s)):{workers:[],items:[],tx:[]};
+      if(!Array.isArray(out.requests))out.requests=[];
+      const deletedIds={}; out.requests.forEach(r=>{if(r&&r.deleted)deletedIds[r.id]=1;});
+      out.requests=out.requests.filter(r=>!r.deleted);
       const rm=remote&&remote.s?normalizeState(remote.s):null;
-      if(rm&&rm.requests){rm.requests.forEach(rr=>{if(!out.requests.some(x=>x.id===rr.id))out.requests.push(rr);});}
+      if(rm&&rm.requests){rm.requests.forEach(rr=>{if(!rr.deleted&&!deletedIds[rr.id]&&!out.requests.some(x=>x.id===rr.id))out.requests.push(rr);});}
       if(rm&&rm.needs){for(let i=0;i<out.needs.length;i++){const tgt=out.needs[i];rm.needs[i]&&rm.needs[i].rows&&rm.needs[i].rows.forEach(rr=>{if(!tgt.rows.some(x=>x.name===rr.name&&x.art===rr.art&&x.qty===rr.qty))tgt.rows.push(rr);});}}
       const payload={s:out,ts:Date.now()};
       const enc=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
@@ -758,7 +764,7 @@ function ghWriteDirect(blob){
   })();
 }
 function moveApprovedToNeeds(){
-  const approved=state.requests.filter(r=>r.approved&&!r.moved);
+  const approved=state.requests.filter(r=>r.approved&&!r.moved&&!r.deleted);
   if(!approved.length){alert("Нет согласованных заявок для переноса.");return;}
   approved.forEach(r=>{
     const si=requestSlotName(r.slot||r.fromName||(worker(r.fromId)?worker(r.fromId).post:""));
