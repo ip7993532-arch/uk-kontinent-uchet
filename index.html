@@ -52,6 +52,8 @@
   .tag.warn{background:var(--warn-bg); color:var(--warn);}
   .tag.bad{background:var(--bad-bg); color:var(--bad);}
   .tag.mut{background:var(--soft); color:var(--muted);}
+  .row-warn{background:#FFF7E0 !important;}
+  .row-warn:hover{background:#FFEFC2 !important;}
   .muted{color:var(--muted); font-size:12px;}
   .empty{padding:24px; text-align:center; color:var(--muted);}
   .grid{display:grid; gap:10px;}
@@ -678,6 +680,38 @@ function requestSlotName(fromName){
   return "";
 }
 function isMaster(w){const p=String((w&&w.post)||"").toLowerCase();return p.indexOf("мастер")>=0;}
+let seenRequestIds=null;
+function initSeenIds(){
+  if(seenRequestIds!==null)return;
+  seenRequestIds={};
+  state.requests.forEach(r=>seenRequestIds[r.id]=1);
+}
+function playBeep(){
+  try{
+    const Ctx=window.AudioContext||window.webkitAudioContext; if(!Ctx)return;
+    const ctx=new Ctx(); const g=ctx.createGain();
+    g.connect(ctx.destination); g.gain.value=0.12;
+    [880,1174].forEach((f,i)=>{
+      const o=ctx.createOscillator(); o.type="sine"; o.frequency.value=f;
+      o.connect(g); const t=ctx.currentTime+i*0.18;
+      o.start(t); o.stop(t+0.16);
+    });
+  }catch(e){}
+}
+function notifyNewRequests(){
+  if(!isAuthed())return;
+  if(seenRequestIds===null){initSeenIds();return;}
+  const fresh=state.requests.filter(r=>!r.deleted&&!r.approved&&!seenRequestIds[r.id]);
+  if(!fresh.length)return;
+  fresh.forEach(r=>seenRequestIds[r.id]=1);
+  const r=fresh[0]; const from=worker(r.fromId)?worker(r.fromId).name:(r.fromName||"");
+  playBeep();
+  try{
+    if(window.Notification&&Notification.permission==="granted"){
+      new Notification("Новая заявка — "+from,{body:r.name||""});
+    }
+  }catch(e){}
+}
 function updateReqBadge(){
   const el=document.getElementById("req_badge"); if(!el)return;
   const n=state.requests.filter(r=>!r.deleted&&!r.approved).length;
@@ -687,6 +721,7 @@ function updateReqBadge(){
 function renderRequests(){
   const ws=document.getElementById("rq_from"); if(!ws)return;
   updateReqBadge();
+  notifyNewRequests();
   const mobile=isMobile();
   // на ПК — только журнал согласования; на телефоне — форма отправки и «Мои заявки»
   const rqNew=document.getElementById("rq_new");
@@ -735,7 +770,7 @@ function renderRequests(){
     list.map(r=>{
       const st=r.approved?"<span class='tag ok'>Согласована</span>":"<span class='tag warn'>Новая</span>";
       const fromName=worker(r.fromId)?worker(r.fromId).name:esc(r.fromName||"");
-      return "<tr><td>"+fmtDate(r.date)+"</td><td>"+fromName+"</td><td>"+esc(r.name)+"</td><td>"+(r.qty||"")+"</td><td>"+esc(r.src||"")+"</td><td>"+esc(r.note||"")+"</td><td>"+st+"</td>"+
+      return "<tr"+(r.approved?'':' class="row-warn"')+"><td>"+fmtDate(r.date)+"</td><td>"+fromName+"</td><td>"+esc(r.name)+"</td><td>"+(r.qty||"")+"</td><td>"+esc(r.src||"")+"</td><td>"+esc(r.note||"")+"</td><td>"+st+"</td>"+
         '<td class="action-row">'+
         (r.approved?'':'<button class="btn sm" data-rq="ok" data-id="'+r.id+'">Согласовать</button>')+
         '<button class="btn sm danger" data-rq="del" data-id="'+r.id+'">Уд.</button></td></tr>';
@@ -1225,11 +1260,23 @@ function renderDash(){
     onHandAll+=onHand(a); const due=dueDate(it.id,a); if(!due)return;
     if(due<today())dueBad.push({w,it,due}); else if(due<=addMonths(today(),1))dueSoon.push({w,it,due});
   }));
+  // статистика по заявкам и сумме потребностей
+  const reqNew=state.requests.filter(r=>!r.deleted&&!r.approved).length;
+  const reqOk=state.requests.filter(r=>!r.deleted&&r.approved).length;
+  let needsTotal=0, needsPos=0;
+  state.needs.forEach(slot=>{(slot.rows||[]).forEach(r=>{
+    if(!r.name)return; needsPos++;
+    const q=parseFloat(String(r.qty).replace(",","."))||0,p=parseFloat(String(r.price).replace(",",".").replace(/[^\d.]/g,""))||0;
+    needsTotal+=q*p;
+  });});
   const wrap=document.getElementById("pledash");
   wrap.innerHTML=
     '<div class="card"><h2>Сводка по учёту</h2>'+
     '<div class="kpis">'+kpi("Работников",state.workers.length)+kpi("Позиций в номенклатуре",state.items.length)+
     kpi("Ед. на руках",onHandAll)+kpi("Операций",state.tx.length)+kpi("Просрочено замен",dueBad.length)+'</div></div>'+
+    '<div class="card"><h2>Заявки и потребности</h2>'+
+    '<div class="kpis">'+kpi("Новых заявок",reqNew)+kpi("Согласованных",reqOk)+
+    kpi("Позиций в потребностях",needsPos)+kpi("Сумма потребностей, ₽",needsTotal.toFixed(0).replace(".",","))+'</div></div>'+
     '<div class="card"><h2>Требуют замены (просрочено / скоро)</h2>'+
     (dueBad.length||dueSoon.length
       ? "<div class='scroll'><table><thead><tr><th>Статус</th><th>Работник</th><th>Позиция</th><th>Замена</th></tr></thead><tbody>"+
@@ -1276,6 +1323,7 @@ async function doEnter(){
   setAuthed(true);
   const enterBtn=document.getElementById("cover_enter");
   enterBtn.disabled=true; enterBtn.textContent="Загрузка данных…";
+  try{if(window.Notification&&Notification.permission==="default"){Notification.requestPermission();}}catch(e){}
   // перед входом тянем актуальные данные из облака (чтение с любого ПК)
   await syncPull();
   save();
