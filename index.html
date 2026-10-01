@@ -616,6 +616,7 @@ function requestSlotName(fromName){
   if(k.indexOf("слесар")>=0)return "Слесарь";
   return "";
 }
+function isMaster(w){const p=String((w&&w.post)||"").toLowerCase();return p.indexOf("мастер")>=0;}
 function renderRequests(){
   const ws=document.getElementById("rq_from"); if(!ws)return;
   const mobile=isMobile();
@@ -626,26 +627,31 @@ function renderRequests(){
   if(rqNew)rqNew.style.display=mobile?"":"none";
   if(journal)journal.style.display=mobile?"none":"";
   if(mine)mine.style.display=mobile?"":"none";
-  // заполнить «От кого» работниками (нужно и для формы на телефоне)
+  // заполнить «От кого» — только мастера участка могут оставлять заявки
   const prev=ws.value;
   ws.length=0;
-  state.workers.forEach(w=>{const o=document.createElement("option");o.value=w.id;o.textContent=w.name+(w.post&&w.post!=="—"?(" ("+w.post+")"):"");ws.appendChild(o);});
+  state.workers.filter(isMaster).forEach(w=>{const o=document.createElement("option");o.value=w.id;o.textContent=w.name+(w.post&&w.post!=="—"?(" ("+w.post+")"):"");ws.appendChild(o);});
   if(prev&&[...ws.options].some(o=>o.value===prev))ws.value=prev;
   if(mobile){
-    const mt=document.getElementById("rq_mine_tbl");
-    const meId=ws.value;
-    const mineList=state.requests.slice().filter(r=>r.fromId===meId).sort((a,b)=>(b.ts||0)-(a.ts||0));
-    if(!mineList.length){mt.innerHTML='<div class="empty">Вы ещё не отправляли заявки.</div>';}
-    else mt.innerHTML="<thead><tr><th>Дата</th><th>Потребность</th><th>Кол-во</th><th>Статус</th></tr></thead><tbody>"+
-      mineList.map(r=>{
-        const st=r.approved?"<span class='tag ok'>Согласована</span>":"<span class='tag warn'>Новая</span>";
-        return "<tr><td>"+fmtDate(r.date)+"</td><td>"+esc(r.name)+"</td><td>"+(r.qty||"")+"</td><td>"+st+"</td></tr>";
-      }).join("")+"</tbody>";
+    if(ws.length===0){document.getElementById("rq_mine_tbl").innerHTML='<div class="empty">Заявки могут оставлять только мастера участка.</div>';}
+    else{
+      const mt=document.getElementById("rq_mine_tbl");
+      const meId=ws.value;
+      const mineList=state.requests.slice().filter(r=>r.fromId===meId).sort((a,b)=>(b.ts||0)-(a.ts||0));
+      if(!mineList.length){mt.innerHTML='<div class="empty">Вы ещё не отправляли заявки.</div>';}
+      else mt.innerHTML="<thead><tr><th>Дата</th><th>Потребность</th><th>Кол-во</th><th>Статус</th></tr></thead><tbody>"+
+        mineList.map(r=>{
+          const st=r.approved?"<span class='tag ok'>Согласована</span>":"<span class='tag warn'>Новая</span>";
+          return "<tr><td>"+fmtDate(r.date)+"</td><td>"+esc(r.name)+"</td><td>"+(r.qty||"")+"</td><td>"+st+"</td></tr>";
+        }).join("")+"</tbody>";
+    }
     return;
   }
-  // журнал заявок на ПК, новые сверху
+  // журнал заявок на ПК — только заявки от мастеров участка, новые сверху
   const t=document.getElementById("rq_tbl");
-  const list=state.requests.slice().sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const list=state.requests.slice().filter(r=>{
+    const w=worker(r.fromId); return isMaster(w)||String(r.fromName||"").toLowerCase().indexOf("мастер")>=0;
+  }).sort((a,b)=>(b.ts||0)-(a.ts||0));
   if(!list.length){t.innerHTML='<div class="empty">Заявок пока нет.</div>';}
   else t.innerHTML="<thead><tr><th>Дата</th><th>От кого</th><th>Потребность</th><th>Кол-во</th><th>Откуда</th><th>Примечание</th><th>Статус</th><th></th></tr></thead><tbody>"+
     list.map(r=>{
@@ -679,6 +685,7 @@ function sendRequest(){
   if(!fromId){alert("Выберите, от кого заявка");return;}
   if(!name){alert("Укажите потребность (наименование)");return;}
   const w=worker(fromId);
+  if(!isMaster(w)){alert("Заявки могут оставлять только мастера участка.");return;}
   const slotName=requestSlotName(w?w.post:"");
   state.requests.push({id:uid(),fromId,fromName:w?w.name:"",name,qty,src,note,date:today(),ts:Date.now(),approved:false,slot:slotName});
   save(); renderRequests();
