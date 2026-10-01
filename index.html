@@ -390,7 +390,7 @@ function normalizeState(s){
   if(!Array.isArray(s.items))s.items=[];
   if(!Array.isArray(s.tx))s.tx=[];
   if(!Array.isArray(s.needs))s.needs=[{name:"Слесарь",rows:[]},{name:"Водитель",rows:[]},{name:"Мастер участка",rows:[]}];
-  s.needs.forEach(n=>{if(!n.rows) n.rows=[]; if(!n.name)n.name="—";});
+  s.needs.forEach(n=>{if(!n.rows) n.rows=[]; if(!n.name)n.name="—"; n.rows.forEach(r=>{if(!r.src)r.src="ВБ";});});
   if(s.needs.length<3){while(s.needs.length<3)s.needs.push({name:["Слесарь","Водитель","Мастер участка"][s.needs.length],rows:[]});}
   return s;
 }
@@ -457,29 +457,45 @@ function renderNeeds(){
   area.innerHTML=state.needs.map((slot,si)=>{
     const rows=slot.rows||[];
     const tbody=rows.length?rows.map((r,ri)=>
-      "<tr><td>"+esc(r.name)+"</td><td>"+esc(r.art||"")+"</td><td>"+(r.qty||"")+"</td><td>"+((r.price===""||r.price==null)?"":(esc(String(r.price))))+"</td>"+
+      "<tr><td>"+esc(r.name)+"</td><td>"+esc(r.art||"")+"</td><td>"+esc(r.src||"")+"</td><td>"+(r.qty||"")+"</td><td>"+((r.price===""||r.price==null)?"":(esc(String(r.price))))+"</td>"+
       '<td class="action-row"><button class="btn sm ghost" data-need="edit" data-si="'+si+'" data-ri="'+ri+'" title="Редактировать">Ред.</button>'+
       '<button class="btn sm danger" data-need="del" data-si="'+si+'" data-ri="'+ri+'">Уд.</button></td></tr>'
-    ).join(""):'<tr><td colspan="5" class="empty">Пусто — добавьте позиции.</td></tr>';
+    ).join(""):'<tr><td colspan="6" class="empty">Пусто — добавьте позиции.</td></tr>';
     return '<div class="card">'+
       '<div class="flex" style="justify-content:space-between;align-items:center"><h2 style="margin-bottom:0">Потребности — '+esc(slot.name)+'</h2>'+
       '<div class="action-row"><button class="btn sm ghost" data-need="print" data-si="'+si+'" title="Печать">Печать</button>'+
       '<button class="btn sm" data-need="word" data-si="'+si+'">Скачать в Word</button></div></div>'+
       '<div class="toolbar" style="margin-top:10px">'+
         '<div class="field"><label>Позиция</label><input data-need="name" data-si="'+si+'" placeholder="Наименование"></div>'+
-        '<div class="field"><label>Артикул</label><input data-need="art" data-si="'+si+'" placeholder="Код" style="width:110px"></div>'+
+        '<div class="field" data-need="artfield" data-si="'+si+'"><label>Артикул</label><input data-need="art" data-si="'+si+'" placeholder="Код" style="width:110px"></div>'+
+        '<div class="field"><label>Откуда</label><select data-need="src" data-si="'+si+'" style="width:140px">'+
+          '<option value="ВБ">ВБ</option><option value="Озон">Озон</option><option value="Иностранный сайт">Иностранный сайт</option>'+
+        '</select></div>'+
         '<div class="field"><label>Кол-во</label><input data-need="qty" data-si="'+si+'" placeholder="шт." style="width:70px"></div>'+
         '<div class="field"><label>Цена, ₽</label><input data-need="price" data-si="'+si+'" placeholder="0,00" style="width:90px"></div>'+
         '<button class="btn" data-need="add" data-si="'+si+'">Добавить</button>'+
       '</div>'+
-      '<div class="scroll"><table><thead><tr><th>Позиция</th><th style="width:110px">Артикул</th><th style="width:70px">Кол-во</th><th style="width:90px">Цена, ₽</th><th style="width:60px"></th></tr></thead><tbody>'+tbody+'</tbody></table></div>'+
+      '<div class="scroll"><table><thead><tr><th>Позиция</th><th style="width:110px">Артикул</th><th style="width:120px">Откуда</th><th style="width:70px">Кол-во</th><th style="width:90px">Цена, ₽</th><th style="width:120px"></th></tr></thead><tbody>'+tbody+'</tbody></table></div>'+
     '</div>';
   }).join("");
+  function toggleArt(si){
+    const sel=area.querySelector('[data-need="src"][data-si="'+si+'"]');
+    const af=area.querySelector('[data-need="artfield"][data-si="'+si+'"]');
+    if(!sel||!af)return;
+    if(sel.value==="Иностранный сайт"){af.style.display="none";}
+    else{af.style.display="";}
+  }
+  area.querySelectorAll("[data-need='src']").forEach(s=>{
+    s.onchange=()=>toggleArt(+s.dataset.si);
+  });
+  state.needs.forEach((slot,si)=>toggleArt(si));
   area.querySelectorAll("[data-need='edit']").forEach(b=>b.onclick=()=>{
     const si=+b.dataset.si, ri=+b.dataset.ri, row=state.needs[si].rows[ri];
     if(!row)return;
     area.querySelector('[data-need="name"][data-si="'+si+'"]').value=row.name||"";
     area.querySelector('[data-need="art"][data-si="'+si+'"]').value=row.art||"";
+    const srcSel=area.querySelector('[data-need="src"][data-si="'+si+'"]');
+    if(srcSel){srcSel.value=["ВБ","Озон","Иностранный сайт"].indexOf(row.src)>=0?row.src:"ВБ"; toggleArt(si);}
     area.querySelector('[data-need="qty"][data-si="'+si+'"]').value=row.qty||"";
     area.querySelector('[data-need="price"][data-si="'+si+'"]').value=(row.price===""||row.price==null)?(row.price||""):String(row.price);
     const addBtn=area.querySelector('[data-need="add"][data-si="'+si+'"]');
@@ -492,6 +508,8 @@ function renderNeeds(){
     const si=+b.dataset.si;
     const nm=area.querySelector('[data-need="name"][data-si="'+si+'"]').value.trim();
     const ar=area.querySelector('[data-need="art"][data-si="'+si+'"]').value.trim();
+    const srcSel=area.querySelector('[data-need="src"][data-si="'+si+'"]');
+    const sc=srcSel?srcSel.value:"ВБ";
     const qy=area.querySelector('[data-need="qty"][data-si="'+si+'"]').value.trim();
     const pr=area.querySelector('[data-need="price"][data-si="'+si+'"]').value.trim();
     if(!nm){alert("Укажите наименование позиции");return;}
@@ -499,14 +517,15 @@ function renderNeeds(){
     if(editIdx!==undefined){
       // режим редактирования – обновляем существующую строку
       const r=state.needs[si].rows[+editIdx];
-      if(r){r.name=nm; r.art=ar; r.qty=qy; r.price=pr;}
+      if(r){r.name=nm; r.art=ar; r.src=sc; r.qty=qy; r.price=pr;}
       delete b.dataset.editing; b.textContent="Добавить";
     }else{
-      state.needs[si].rows.push({name:nm,art:ar,qty:qy,price:pr});
+      state.needs[si].rows.push({name:nm,art:ar,src:sc,qty:qy,price:pr});
     }
     save(); renderNeeds();
     area.querySelector('[data-need="name"][data-si="'+si+'"]').value="";
     area.querySelector('[data-need="art"][data-si="'+si+'"]').value="";
+    if(srcSel)srcSel.value="ВБ"; toggleArt(si);
     area.querySelector('[data-need="qty"][data-si="'+si+'"]').value="";
     area.querySelector('[data-need="price"][data-si="'+si+'"]').value="";
   });
@@ -526,10 +545,10 @@ function renderNeeds(){
     const rowsData=slot.rows||[];
     if(!rowsData.length){alert("Слот пуст — сначала добавьте позиции.");return;}
     function toNum(v){const s=String(v==null?"":v).replace(/[^\d.,-]/g,"").replace(",",".");const n=parseFloat(s);return isFinite(n)?n:0;}
-    const rows=rowsData.map(r=>[r.name,r.art||"",r.qty||"",(r.price===""||r.price==null)?(r.price||""):String(r.price)]);
+    const rows=rowsData.map(r=>[r.name,r.art||"",r.src||"",r.qty||"",(r.price===""||r.price==null)?(r.price||""):String(r.price)]);
     let total=0;
     rowsData.forEach(r=>{total+=toNum(r.price)*toNum(r.qty);});
-    const table=wordTable("",["Позиция","Артикул","Кол-во","Цена, ₽"],rows);
+    const table=wordTable("",["Позиция","Артикул","Откуда","Кол-во","Цена, ₽"],rows);
     const totalTxt=total.toFixed(2).replace(".",",");
     const kit="<table class='t' style='margin-top:6px;width:100%;border-collapse:collapse'>"+
       "<tr><td style='border:1px solid #000;padding:4px 6px;text-align:right'><b>ИТОГО:</b></td>"+
