@@ -296,7 +296,7 @@ function renderEng(){
     const same=state.engTasks.filter(x=>!x.deleted&&x.date===dd);
     const x=same[idx];if(!x)return;
     if(b.dataset.eng==="del"){if(confirm("Удалить задачу?")){x.deleted=true;}}
-    save();renderEng();
+    save();renderEng();ghWrite({s:state,ts:Date.now()});
   });
 }
 document.getElementById("eng_add").addEventListener("click",()=>{
