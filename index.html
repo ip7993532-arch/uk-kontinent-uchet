@@ -152,6 +152,7 @@
     <button data-tab="cards">Карточки СИЗ</button>
     <button data-tab="reports">Отчёты</button>
     <button data-tab="needs">Потребности</button>
+    <button data-tab="requests">Заявки</button>
   </nav>
 
   <!-- СВОДКА -->
@@ -253,6 +254,28 @@
     </div>
   </section>
 
+  <!-- ЗАЯВКИ -->
+  <section class="panel" id="plrequests">
+    <div class="card">
+      <h2>Новая заявка на потребности</h2>
+      <div class="muted" style="margin-bottom:8px">Заявку можно отправить с любого устройства (телефон/ПК) — она сохранится в облаке и появится у инженера.</div>
+      <div class="toolbar">
+        <div class="field"><label>От кого</label><select id="rq_from"></select></div>
+        <div class="field"><label>Потребность (товар/СИЗ)</label><input id="rq_name" placeholder="Наименование"></div>
+        <div class="field"><label>Кол-во</label><input id="rq_qty" placeholder="шт." style="width:70px"></div>
+        <div class="field"><label>Откуда</label><select id="rq_src" style="width:150px">
+          <option value="ВБ">ВБ</option><option value="Озон">Озон</option><option value="Иностороний сайт">Иностороний сайт</option>
+        </select></div>
+        <div class="field"><label>Примечание</label><input id="rq_note" placeholder="—" style="width:150px"></div>
+        <button class="btn" id="rq_send">Отправить заявку</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Журнал заявок на согласование <button class="btn sm ghost" id="rq_open_all">Перенести согласованные в потребности</button></h2>
+      <div class="scroll"><table id="rq_tbl"></table></div>
+    </div>
+  </section>
+
   <!-- ПОТРЕБНОСТИ -->
   <section class="panel" id="plneeds">
     <div class="card">
@@ -344,6 +367,10 @@ async function syncPull(){
       }
     });
   }
+  // объединяем заявки (не теряем ни из облака, ни локальные)
+  state.requests.forEach(lr=>{
+    if(!rc.requests.some(r=>r.id===lr.id))rc.requests.push(lr);
+  });
   const hasLocal=state.workers.length||state.items.length||state.tx.length;
   const hasRemote=rc.workers.length||rc.items.length||rc.tx.length;
   if(hasRemote||!hasLocal){state=rc; return true;}
@@ -389,6 +416,7 @@ function normalizeState(s){
   if(!Array.isArray(s.workers))s.workers=[];
   if(!Array.isArray(s.items))s.items=[];
   if(!Array.isArray(s.tx))s.tx=[];
+  if(!Array.isArray(s.requests))s.requests=[];
   if(!Array.isArray(s.needs))s.needs=[{name:"Слесарь",rows:[]},{name:"Водитель",rows:[]},{name:"Мастер участка",rows:[]}];
   s.needs.forEach(n=>{if(!n.rows) n.rows=[]; if(!n.name)n.name="—"; n.rows.forEach(r=>{if(!r.src)r.src="ВБ";});});
   if(s.needs.length<3){while(s.needs.length<3)s.needs.push({name:["Слесарь","Водитель","Мастер участка"][s.needs.length],rows:[]});}
@@ -410,7 +438,7 @@ async function recoverFromIDB(){
   const lsEmpty=!state.workers.length&&!state.items.length&&!state.tx.length;
   if(lsEmpty){
     state=normalizeState(rec.s); save();
-    renderDash(); renderWorkers(); renderItems(); renderOps(); renderOpsForm(); renderCards(); renderSide(); renderNeeds();
+    renderDash(); renderWorkers(); renderItems(); renderOps(); renderOpsForm(); renderCards(); renderSide(); renderNeeds(); renderRequests();
   }
 }
 
@@ -570,6 +598,75 @@ function renderNeeds(){
 }
 function slug(s){return String(s||"").toLowerCase().replace(/[^a-zа-яё0-9]+/gi,"-").replace(/^-+|-+$/g,"")||"slot";}
 
+// ---------- Заявки на потребности ----------
+function requestSlotName(fromName){
+  const k=String(fromName||"").toLowerCase();
+  if(k.indexOf("мастер")>=0)return "Мастер участка";
+  if(k.indexOf("водител")>=0)return "Водитель";
+  if(k.indexOf("слесар")>=0)return "Слесарь";
+  return "";
+}
+function renderRequests(){
+  const ws=document.getElementById("rq_from"); if(!ws)return;
+  // заполнить «От кого» работниками
+  const prev=ws.value;
+  ws.length=0;
+  state.workers.forEach(w=>{const o=document.createElement("option");o.value=w.id;o.textContent=w.name+(w.post&&w.post!=="—"?(" ("+w.post+")"):"");ws.appendChild(o);});
+  if(prev&&[...ws.options].some(o=>o.value===prev))ws.value=prev;
+  // журнал заявок, новые сверху
+  const t=document.getElementById("rq_tbl");
+  const list=state.requests.slice().sort((a,b)=>(b.ts||0)-(a.ts||0));
+  if(!list.length){t.innerHTML='<div class="empty">Заявок пока нет.</div>';}
+  else t.innerHTML="<thead><tr><th>Дата</th><th>От кого</th><th>Потребность</th><th>Кол-во</th><th>Откуда</th><th>Примечание</th><th>Статус</th><th></th></tr></thead><tbody>"+
+    list.map(r=>{
+      const st=r.approved?"<span class='tag ok'>Согласована</span>":"<span class='tag warn'>Новая</span>";
+      const fromName=worker(r.fromId)?worker(r.fromId).name:esc(r.fromName||"");
+      return "<tr><td>"+fmtDate(r.date)+"</td><td>"+fromName+"</td><td>"+esc(r.name)+"</td><td>"+(r.qty||"")+"</td><td>"+esc(r.src||"")+"</td><td>"+esc(r.note||"")+"</td><td>"+st+"</td>"+
+        '<td class="action-row">'+
+        (r.approved?'':'<button class="btn sm" data-rq="ok" data-id="'+r.id+'">Согласовать</button>')+
+        '<button class="btn sm danger" data-rq="del" data-id="'+r.id+'">Уд.</button></td></tr>';
+    }).join("")+"</tbody>";
+  t.querySelectorAll("[data-rq='ok']").forEach(b=>b.onclick=()=>{
+    const r=state.requests.find(x=>x.id===b.dataset.id); if(!r)return;
+    r.approved=true; r.approvedAt=today(); save(); renderRequests();
+  });
+  t.querySelectorAll("[data-rq='del']").forEach(b=>b.onclick=()=>{
+    if(confirm("Удалить заявку?")){state.requests=state.requests.filter(x=>x.id!==b.dataset.id);save();renderRequests();}
+  });
+}
+function sendRequest(){
+  const fromId=document.getElementById("rq_from").value;
+  const name=document.getElementById("rq_name").value.trim();
+  const qty=document.getElementById("rq_qty").value.trim();
+  const src=document.getElementById("rq_src").value;
+  const note=document.getElementById("rq_note").value.trim();
+  if(!fromId){alert("Выберите, от кого заявка");return;}
+  if(!name){alert("Укажите потребность (наименование)");return;}
+  const w=worker(fromId);
+  const slotName=requestSlotName(w?w.post:"");
+  state.requests.push({id:uid(),fromId,fromName:w?w.name:"",name,qty,src,note,date:today(),ts:Date.now(),approved:false,slot:slotName});
+  save(); renderRequests();
+  document.getElementById("rq_name").value=""; document.getElementById("rq_qty").value="";
+  document.getElementById("rq_note").value=""; document.getElementById("rq_src").value="ВБ";
+  alert("Заявка отправлена и сохранена в облаке. Инженер её увидит после обновления страницы.");
+}
+function moveApprovedToNeeds(){
+  const approved=state.requests.filter(r=>r.approved&&!r.moved);
+  if(!approved.length){alert("Нет согласованных заявок для переноса.");return;}
+  approved.forEach(r=>{
+    const si=requestSlotName(r.slot||r.fromName||(worker(r.fromId)?worker(r.fromId).post:""));
+    let idx=state.needs.findIndex(n=>n.name===si);
+    if(si&&idx>=0){
+      state.needs[idx].rows.push({name:r.name,art:"",src:r.src||"ВБ",qty:r.qty||"",price:""});
+      r.moved=true;
+    }
+  });
+  save(); renderRequests(); renderNeeds();
+  alert("Согласованные заявки перенесены в соответствующие слоты потребностей.");
+}
+document.getElementById("rq_send").addEventListener("click",sendRequest);
+document.getElementById("rq_open_all").addEventListener("click",moveApprovedToNeeds);
+
 // ---------- Tabs ----------
 document.getElementById("tabs").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
@@ -581,6 +678,7 @@ document.getElementById("tabs").addEventListener("click",e=>{
   if(b.dataset.tab==="reports")renderReports();
   if(b.dataset.tab==="dash")renderDash();
   if(b.dataset.tab==="needs")renderNeeds();
+  if(b.dataset.tab==="requests")renderRequests();
 });
 
 // ---------- Workers ----------
@@ -954,6 +1052,7 @@ function qGo(tab){
   if(tab==="reports")renderReports();
   if(tab==="dash")renderDash();
   if(tab==="needs")renderNeeds();
+  if(tab==="requests")renderRequests();
 }
 
 document.getElementById("r_from").addEventListener("change",renderReports);
@@ -981,7 +1080,7 @@ async function doEnter(){
   // перед входом тянем актуальные данные из облака (чтение с любого ПК)
   await syncPull();
   save();
-  renderDash(); renderWorkers(); renderItems(); renderOps(); renderOpsForm(); renderCards(); renderSide(); renderNeeds();
+  renderDash(); renderWorkers(); renderItems(); renderOps(); renderOpsForm(); renderCards(); renderSide(); renderNeeds(); renderRequests();
   document.getElementById("cover").classList.add("hide");
 }
 document.getElementById("cover_enter").addEventListener("click",doEnter);
@@ -1003,7 +1102,7 @@ function importBackup(file){
       const st=data.state;
       if(!st||!Array.isArray(st.workers)||!Array.isArray(st.items)||!Array.isArray(st.tx))throw new Error("bad");
       state=normalizeState(st); save();
-renderDash(); renderWorkers(); renderItems(); renderOps(); renderOpsForm(); renderCards(); renderSide(); renderNeeds();
+renderDash(); renderWorkers(); renderItems(); renderOps(); renderOpsForm(); renderCards(); renderSide(); renderNeeds(); renderRequests();
       alert("Данные успешно восстановлены. Это окно можно закрыть.");
     }catch(e){alert("Некорректный файл резервной копии: данные не изменены.");}
   };
@@ -1081,7 +1180,7 @@ function closeModal(){document.getElementById("modal").classList.remove("open");
 
 // Init
 loadFromHash();
-renderDash(); renderWorkers(); renderItems(); renderOps(); renderOpsForm(); renderCards(); renderSide(); renderNeeds();
+renderDash(); renderWorkers(); renderItems(); renderOps(); renderOpsForm(); renderCards(); renderSide(); renderNeeds(); renderRequests();
 recoverFromIDB();
 // если уже авторизован в этой сессии — подтянуть свежие онлайн-данные
 if(isAuthed()){syncPull().then(ok=>{if(ok){save();renderDash();renderWorkers();renderItems();renderOps();renderOpsForm();renderCards();renderSide();}});}
