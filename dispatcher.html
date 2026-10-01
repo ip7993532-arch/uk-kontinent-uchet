@@ -142,28 +142,10 @@ const AUTH_PASS="252525";
 const GH={owner:"ip7993532-arch",repo:"uk-kontinent-uchet",branch:"main",file:"data.json",tokenKey:"uk_kon_gh_token"};
 const API="https://api.github.com/repos/"+GH.owner+"/"+GH.repo;
 const RAW="https://raw.githubusercontent.com/"+GH.owner+"/"+GH.repo+"/"+GH.branch+"/"+GH.file;
-// ===== Firebase Realtime Database (мгновенная синхронизация) =====
-const FIREBASE_CONFIG={apiKey:"AIzaSyDypZfKKFJeclHfzHq79rLbiq-CoEOmUck",authDomain:"uk-kontinent.firebaseapp.com",projectId:"uk-kontinent",storageBucket:"uk-kontinent.firebasestorage.app",messagingSenderId:"801621151752",appId:"1:801621151752:web:2ce35390acc3e62b4241bd",measurementId:"G-YLKTE28PH9",databaseURL:"https://uk-kontinent-default-rtdb.europe-west1.firebasedatabase.app"};
-let fbApp=null, fbDb=null;
-function fbSet(){try{if(typeof window.FirebaseLib!=="undefined"&&fbDb){fbDb.ref("state").set(JSON.stringify(state));return true;}}catch(e){}return false;}
-function fbPush(){clearTimeout(window.__fbT);window.__fbT=setTimeout(function(){fbSet();ghWrite({s:state,ts:Date.now()});},300);}
-function initFirebase(){
-  try{
-    if(typeof window.FirebaseLib==="undefined")return;
-    const F=window.FirebaseLib; fbApp=F.initializeApp(FIREBASE_CONFIG,"ukapp"); fbDb=F.getDatabase(fbApp);
-    F.onValue(F.ref(fbDb,"state"),function(snap){
-      try{const v=snap.val(); if(!v)return; const remote=JSON.parse(v); if(!remote||!Array.isArray(remote.workers))return;
-        const rc=norm(remote); if(rc.workers.length||rc.items.length||rc.engTasks.length){state=rc;save();renderCards();renderEng();}
-      }catch(e){}
-    });
-  }catch(e){}
-}
-function loadFirebaseSDK(){
-  if(window.FirebaseLib)return;
-  const s=document.createElement("script"); s.src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
-  s.onload=function(){const s2=document.createElement("script"); s2.src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js"; s2.onload=function(){initFirebase();}; document.head.appendChild(s2);};
-  document.head.appendChild(s);
-}
+// Firebase-канал временно отключён до точной настройки; работает стабильный GitHub-канал
+let fbSet=function(){return false;};
+let fbPush=function(){clearTimeout(window.__fbT);window.__fbT=setTimeout(function(){ghWrite({s:state,ts:Date.now()});},300);};
+let loadFirebaseSDK=function(){};
 let ghSyncBusy=false, ghQueued=false;
 function ghToken(){try{const l=localStorage.getItem(GH.tokenKey);if(l)return l;}catch(e){}return ["ghp_","uQ5E8HWRGM5ASUfHR9NBkEoGs1WKuL0M","GnLo"].join("");}
 function ghAuth(){return {Authorization:"token "+ghToken()};}
