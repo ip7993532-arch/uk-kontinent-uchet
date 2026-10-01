@@ -303,7 +303,8 @@
       <div class="scroll"><table id="rq_mine_tbl"></table></div>
     </div>
     <div class="card" id="rq_journal">
-      <h2>Журнал заявок на согласование <button class="btn sm ghost" id="rq_open_all">Перенести согласованные в потребности</button></h2>
+      <h2>Журнал заявок на согласование <button class="btn sm ghost" id="rq_open_all">Перенести согласованные в потребности</button>
+      <select id="rq_filter" style="margin-left:10px;padding:4px 8px;font-size:12px"><option value="all">Все</option><option value="new">Новые</option><option value="ok">Согласованные</option></select></h2>
       <div class="scroll"><table id="rq_tbl"></table></div>
     </div>
   </section>
@@ -554,8 +555,13 @@ function renderNeeds(){
       '<td class="action-row"><button class="btn sm ghost" data-need="edit" data-si="'+si+'" data-ri="'+ri+'" title="Редактировать">Ред.</button>'+
       '<button class="btn sm danger" data-need="del" data-si="'+si+'" data-ri="'+ri+'">Уд.</button></td></tr>'
     ).join(""):'<tr><td colspan="6" class="empty">Пусто — добавьте позиции.</td></tr>';
+    // сумма по слоту (цена × кол-во)
+    let slotTotal=0;
+    rows.forEach(r=>{const q=parseFloat(String(r.qty).replace(",","."))||0,p=parseFloat(String(r.price).replace(",",".").replace(/[^\d.]/g,""))||0;slotTotal+=q*p;});
+    const totalCell=slotTotal>0?"<tr><td colspan='4' style='text-align:right'><b>ИТОГО:</b></td><td style='text-align:right'><b>"+slotTotal.toFixed(2).replace(".",",")+" ₽</b></td><td></td></tr>":"";
     return '<div class="card">'+
-      '<div class="flex" style="justify-content:space-between;align-items:center"><h2 style="margin-bottom:0">Потребности — '+esc(slot.name)+'</h2>'+
+      '<div class="flex" style="justify-content:space-between;align-items:center"><h2 style="margin-bottom:0">Потребности — '+esc(slot.name)+
+      (slotTotal>0?(' <span class="tag" style="background:var(--ok-bg);color:var(--ok)">'+slotTotal.toFixed(0).replace(".",",")+' ₽</span>'):"")+"</h2>"+
       '<div class="action-row"><button class="btn sm ghost" data-need="print" data-si="'+si+'" title="Печать">Печать</button>'+
       '<button class="btn sm" data-need="word" data-si="'+si+'">Скачать в Word</button></div></div>'+
       '<div class="toolbar" style="margin-top:10px">'+
@@ -568,7 +574,7 @@ function renderNeeds(){
         '<div class="field"><label>Цена, ₽</label><input data-need="price" data-si="'+si+'" placeholder="0,00" style="width:90px"></div>'+
         '<button class="btn" data-need="add" data-si="'+si+'">Добавить</button>'+
       '</div>'+
-      '<div class="scroll"><table><thead><tr><th>Позиция</th><th style="width:110px">Артикул</th><th style="width:120px">Откуда</th><th style="width:70px">Кол-во</th><th style="width:90px">Цена, ₽</th><th style="width:120px"></th></tr></thead><tbody>'+tbody+'</tbody></table></div>'+
+      '<div class="scroll"><table><thead><tr><th>Позиция</th><th style="width:110px">Артикул</th><th style="width:120px">Откуда</th><th style="width:70px">Кол-во</th><th style="width:90px">Цена, ₽</th><th style="width:120px"></th></tr></thead><tbody>'+tbody+totalCell+'</tbody></table></div>'+
     '</div>';
   }).join("");
   function toggleArt(si){
@@ -720,7 +726,10 @@ function renderRequests(){
   }
   // журнал заявок на ПК — только заявки от мастеров участка, новые сверху
   const t=document.getElementById("rq_tbl");
-  const list=state.requests.slice().filter(r=>!r.deleted&&(isMaster(worker(r.fromId))||String(r.fromName||"").toLowerCase().indexOf("мастер")>=0)).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const f=document.getElementById("rq_filter"); const fv=f?f.value:"all";
+  const list=state.requests.slice().filter(r=>!r.deleted&&(isMaster(worker(r.fromId))||String(r.fromName||"").toLowerCase().indexOf("мастер")>=0))
+    .filter(r=>fv==="all"?true:fv==="new"?!r.approved:r.approved)
+    .sort((a,b)=>(b.ts||0)-(a.ts||0));
   if(!list.length){t.innerHTML='<div class="empty">Заявок пока нет.</div>';}
   else t.innerHTML="<thead><tr><th>Дата</th><th>От кого</th><th>Потребность</th><th>Кол-во</th><th>Откуда</th><th>Примечание</th><th>Статус</th><th></th></tr></thead><tbody>"+
     list.map(r=>{
@@ -833,6 +842,7 @@ function moveApprovedToNeeds(){
 }
 document.getElementById("rq_send").addEventListener("click",sendRequest);
 document.getElementById("rq_open_all").addEventListener("click",moveApprovedToNeeds);
+document.getElementById("rq_filter").addEventListener("change",renderRequests);
 document.getElementById("needs_export_all").addEventListener("click",exportAllNeeds);
 window.addEventListener("resize",()=>{if(isMobile())renderRequests();});
 function exportAllNeeds(){
