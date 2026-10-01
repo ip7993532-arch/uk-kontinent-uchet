@@ -443,7 +443,29 @@ async function ghWrite(blob){
     const enc=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
     const body={message:"Автосохранение",content:enc,branch:GH.branch};
     if(sha)body.sha=sha;
-    const r=await fetch(API+"/contents/"+GH.file,{method:"PUT",headers:Object.assign(ghAuth(),ghHeaders()),body:JSON.stringify(body)});
+    // запись с повтором при конфликте (409): читаем свежее, объединяем, пишем снова
+    let r=null;
+    for(let attempt=0;attempt<5;attempt++){
+      r=await fetch(API+"/contents/"+GH.file,{method:"PUT",headers:Object.assign(ghAuth(),ghHeaders()),body:JSON.stringify(body)});
+      if(r.ok)break;
+      if(r.status==="409"||r.status===409){
+        try{
+          const meta2=await(await fetch(API+"/contents/"+GH.file+"?ref="+GH.branch,{headers:Object.assign(ghAuth(),ghHeaders())})).json();
+          if(!meta2.sha)break; body.sha=meta2.sha;
+          if(meta2.content){const r2=JSON.parse(decodeURIComponent(escape(atob(meta2.content.replace(/\s/g,"")))));
+            // объединить актуальные заявки/задачи из облака в out
+            const rm2=r2&&r2.s?normalizeState(r2.s):null;
+            if(rm2&&rm2.deletedRequests){rm2.deletedRequests.forEach(id=>{if(!out.deletedRequests.includes(id))out.deletedRequests.push(id);});}
+            if(rm2&&rm2.requests){rm2.requests.forEach(rr=>{if(!rr.deleted&&!out.deletedRequests.includes(rr.id)&&!out.requests.some(x=>x.id===rr.id))out.requests.push(rr);});}
+            out.requests=out.requests.filter(x=>!out.deletedRequests.includes(x.id));
+            if(rm2&&rm2.deletedEngTasks){rm2.deletedEngTasks.forEach(id=>{if(!out.deletedEngTasks.includes(id))out.deletedEngTasks.push(id);});}
+            if(rm2&&rm2.engTasks){rm2.engTasks.forEach(rt=>{if(!rt.deleted&&!out.deletedEngTasks.includes(rt.id)&&!out.engTasks.some(x=>x.id===rt.id))out.engTasks.push(rt);});}
+            out.engTasks=out.engTasks.filter(t=>!out.deletedEngTasks.includes(t.id)&&!t.deleted);
+            body.content=btoa(unescape(encodeURIComponent(JSON.stringify({s:out,ts:Date.now()}))));
+          }
+        }catch(e){break;}
+      }else{break;}
+    }
     if(!r.ok){console.warn("ghWrite ",r.status);}else{state=out;}
     // после успеха актуализируем локальное состояние (другие устройства)
     if(state.requests)state.requests=out.requests;
