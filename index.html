@@ -135,6 +135,7 @@
     <button class="hbtn" id="bk_backup" title="Скачать резервную копию данных (.json)">Резервная копия</button>
     <button class="hbtn" id="bk_restore" title="Восстановить данные из .json">Восстановить</button>
     <button class="hbtn" id="bk_link" title="Скопировать ссылку с данными — на другом устройстве откроется это же">Ссылка с данными</button>
+    <button class="hbtn" id="logout_btn" title="Выйти (сбросить запоминание входа на этом устройстве)">Выйти</button>
     <input type="file" id="bk_file" accept=".json,application/json" hidden>
   </div>
   <span class="badge">Главный инженер · автономный режим</span>
@@ -1195,8 +1196,8 @@ document.getElementById("r_to").addEventListener("change",renderReports);
 // ---------- Обложка и вход по паролю ----------
 const AUTH_PASS="252525";
 function authKey(){return "uk_kon_auth";}
-function isAuthed(){try{return sessionStorage.getItem(authKey())==="1";}catch(e){return localStorage.getItem(authKey())==="1";}}
-function setAuthed(v){try{sessionStorage.setItem(authKey(),v?"1":"0");}catch(e){try{localStorage.setItem(authKey(),v?"1":"0");}catch(e2){}}}
+function isAuthed(){try{return localStorage.getItem(authKey())==="1";}catch(e){return false;}}
+function setAuthed(v){try{localStorage.setItem(authKey(),v?"1":"0");}catch(e){}}
 async function doEnter(){
   const pass=document.getElementById("cover_pass").value;
   if(pass!==AUTH_PASS){
@@ -1220,6 +1221,9 @@ async function doEnter(){
 document.getElementById("cover_enter").addEventListener("click",doEnter);
 document.getElementById("cover_pass").addEventListener("keydown",e=>{if(e.key==="Enter")doEnter();});
 if(isAuthed()){document.getElementById("cover").classList.add("hide");}
+document.getElementById("logout_btn").addEventListener("click",()=>{
+  if(confirm("Выйти? После этого на этом устройстве снова будет запрашиваться пароль.")){setAuthed(false);location.reload();}
+});
 
 // ---------- Резервная копия (перенос на другой ПК) ----------
 function exportBackup(){
