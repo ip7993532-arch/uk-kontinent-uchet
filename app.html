@@ -497,7 +497,11 @@ async function syncPull(){
   rc.requests=rc.requests.filter(r=>!delIds[r.id]);
   state.requests=state.requests.filter(r=>!delIds[r.id]);
   state.requests.forEach(lr=>{
-    if(!delIds[lr.id]&&!rc.requests.some(r=>r.id===lr.id))rc.requests.push(lr);
+    if(!delIds[lr.id]){
+      const ex=rc.requests.find(r=>r.id===lr.id);
+      if(!ex){rc.requests.push(lr);}
+      else if(lr.approved){ex.approved=true;}
+    }
   });
   // объединяем задачи инженера (не теряем с других ПК; удалённые из deletedEngTasks не возвращаем)
   const delTaskIds={}; (state.deletedEngTasks||[]).forEach(id=>delTaskIds[id]=1); (rc.deletedEngTasks||[]).forEach(id=>delTaskIds[id]=1);
@@ -853,7 +857,7 @@ function renderRequests(){
     }).join("")+"</tbody>";
   t.querySelectorAll("[data-rq='ok']").forEach(b=>b.onclick=()=>{
     const r=state.requests.find(x=>x.id===b.dataset.id); if(!r)return;
-    r.approved=true; r.approvedAt=today(); save(); renderRequests();
+    r.approved=true; r.approvedAt=today(); save(); renderRequests(); flushCloudWrite();
   });
   t.querySelectorAll("[data-rq='del']").forEach(b=>b.onclick=()=>{
     if(confirm("Удалить заявку?")){
