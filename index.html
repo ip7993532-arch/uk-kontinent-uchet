@@ -639,11 +639,15 @@ function renderRequests(){
       const meId=ws.value;
       const mineList=state.requests.slice().filter(r=>r.fromId===meId).sort((a,b)=>(b.ts||0)-(a.ts||0));
       if(!mineList.length){mt.innerHTML='<div class="empty">Вы ещё не отправляли заявки.</div>';}
-      else mt.innerHTML="<thead><tr><th>Дата</th><th>Потребность</th><th>Кол-во</th><th>Статус</th></tr></thead><tbody>"+
+      else mt.innerHTML="<thead><tr><th>Дата</th><th>Потребность</th><th>Кол-во</th><th>Статус</th><th></th></tr></thead><tbody>"+
         mineList.map(r=>{
           const st=r.approved?"<span class='tag ok'>Согласована</span>":"<span class='tag warn'>Новая</span>";
-          return "<tr><td>"+fmtDate(r.date)+"</td><td>"+esc(r.name)+"</td><td>"+(r.qty||"")+"</td><td>"+st+"</td></tr>";
+          return "<tr><td>"+fmtDate(r.date)+"</td><td>"+esc(r.name)+"</td><td>"+(r.qty||"")+"</td><td>"+st+"</td>"+
+            '<td><button class="btn sm danger" data-rq="mdel" data-id="'+r.id+'">Уд.</button></td></tr>';
         }).join("")+"</tbody>";
+      mt.querySelectorAll("[data-rq='mdel']").forEach(b=>b.onclick=()=>{
+        if(confirm("Удалить свою заявку?")){state.requests=state.requests.filter(x=>x.id!==b.dataset.id);save();renderRequests();}
+      });
     }
     return;
   }
