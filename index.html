@@ -699,7 +699,7 @@ function isMobile(){
   const ua=String(navigator.userAgent||"");
   return /Android|iPhone|iPad|iPod|Mobile|Opera Mini|IEMobile/i.test(ua);
 }
-function sendRequest(){
+async function sendRequest(){
   const fromId=document.getElementById("rq_from").value;
   const name=document.getElementById("rq_name").value.trim();
   const qty=document.getElementById("rq_qty").value.trim();
@@ -714,7 +714,47 @@ function sendRequest(){
   save(); renderRequests();
   document.getElementById("rq_name").value=""; document.getElementById("rq_qty").value="";
   document.getElementById("rq_note").value=""; document.getElementById("rq_src").value="ВБ";
-  alert("Заявка отправлена и сохранена в облаке. Инженер её увидит после обновления страницы.");
+  // немедленная онлайн-запись с реальным результатом
+  const okNow=await flushCloudWrite();
+  if(okNow){alert("Заявка отправлена и сохранена в облаке. Инженер увидит её после обновления страницы.");}
+  else{alert("Заявка сохранена на вашем устройстве, но НЕ удалось отправить её в облако. Проверьте интернет и повторите. (Ошибка онлайн-записи)");}
+}
+async function flushCloudWrite(){
+  // принудительная немедленная онлайн-запись, возвращает true при успехе
+  if(!ghAuthed())return false;
+  const prevBusy=ghSyncBusy;
+  ghSyncBusy=false;
+  return await new Promise(resolve=>{
+    ghWriteDirect({s:state,ts:Date.now()}).then(ok=>{ghSyncBusy=prevBusy;resolve(ok);});
+  });
+}
+let ghWriteDirectBusy=false, ghWriteDirectQueued=false;
+function ghWriteDirect(blob){
+  // прямой вариант ghWrite без общей очереди — с явным результатом
+  if(ghWriteDirectBusy){ghWriteDirectQueued=true; return Promise.resolve(false);}
+  ghWriteDirectBusy=true;
+  return (async()=>{
+    let ok=false;
+    try{
+      let remote=null;
+      try{const raw=await fetch(RAW,{cache:"no-store"}); if(raw.ok){const t=await raw.text(); if(t&&t.trim())remote=JSON.parse(t);}}catch(e){}
+      const out=blob.s?JSON.parse(JSON.stringify(blob.s)):{workers:[],items:[],tx:[]};
+      const rm=remote&&remote.s?normalizeState(remote.s):null;
+      if(rm&&rm.requests){rm.requests.forEach(rr=>{if(!out.requests.some(x=>x.id===rr.id))out.requests.push(rr);});}
+      if(rm&&rm.needs){for(let i=0;i<out.needs.length;i++){const tgt=out.needs[i];rm.needs[i]&&rm.needs[i].rows&&rm.needs[i].rows.forEach(rr=>{if(!tgt.rows.some(x=>x.name===rr.name&&x.art===rr.art&&x.qty===rr.qty))tgt.rows.push(rr);});}}
+      let sha=null;
+      try{const meta=await (await fetch(API+"/contents/"+GH.file+"?ref="+GH.branch,{headers:Object.assign(ghAuth(),ghHeaders())})).json(); if(meta.sha)sha=meta.sha;}catch(e){}
+      const payload={s:out,ts:Date.now()};
+      const enc=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+      const body={message:"Автосохранение",content:enc,branch:GH.branch};
+      if(sha)body.sha=sha;
+      const r=await fetch(API+"/contents/"+GH.file,{method:"PUT",headers:Object.assign(ghAuth(),ghHeaders()),body:JSON.stringify(body)});
+      ok=r.ok;
+    }catch(e){ok=false;}
+    ghWriteDirectBusy=false;
+    if(ghWriteDirectQueued){ghWriteDirectQueued=false; ghWriteDirect({s:state,ts:Date.now()});}
+    return ok;
+  })();
 }
 function moveApprovedToNeeds(){
   const approved=state.requests.filter(r=>r.approved&&!r.moved);
