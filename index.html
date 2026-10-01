@@ -436,7 +436,8 @@ function renderNeeds(){
     const rows=slot.rows||[];
     const tbody=rows.length?rows.map((r,ri)=>
       "<tr><td>"+esc(r.name)+"</td><td>"+esc(r.art||"")+"</td><td>"+(r.qty||"")+"</td><td>"+((r.price===""||r.price==null)?"":(esc(String(r.price))))+"</td>"+
-      '<td class="action-row"><button class="btn sm danger" data-need="del" data-si="'+si+'" data-ri="'+ri+'">Уд.</button></td></tr>'
+      '<td class="action-row"><button class="btn sm ghost" data-need="edit" data-si="'+si+'" data-ri="'+ri+'" title="Редактировать">Ред.</button>'+
+      '<button class="btn sm danger" data-need="del" data-si="'+si+'" data-ri="'+ri+'">Уд.</button></td></tr>'
     ).join(""):'<tr><td colspan="5" class="empty">Пусто — добавьте позиции.</td></tr>';
     return '<div class="card">'+
       '<div class="flex" style="justify-content:space-between;align-items:center"><h2 style="margin-bottom:0">Потребности — '+esc(slot.name)+'</h2>'+
@@ -452,6 +453,19 @@ function renderNeeds(){
       '<div class="scroll"><table><thead><tr><th>Позиция</th><th style="width:110px">Артикул</th><th style="width:70px">Кол-во</th><th style="width:90px">Цена, ₽</th><th style="width:60px"></th></tr></thead><tbody>'+tbody+'</tbody></table></div>'+
     '</div>';
   }).join("");
+  area.querySelectorAll("[data-need='edit']").forEach(b=>b.onclick=()=>{
+    const si=+b.dataset.si, ri=+b.dataset.ri, row=state.needs[si].rows[ri];
+    if(!row)return;
+    area.querySelector('[data-need="name"][data-si="'+si+'"]').value=row.name||"";
+    area.querySelector('[data-need="art"][data-si="'+si+'"]').value=row.art||"";
+    area.querySelector('[data-need="qty"][data-si="'+si+'"]').value=row.qty||"";
+    area.querySelector('[data-need="price"][data-si="'+si+'"]').value=(row.price===""||row.price==null)?(row.price||""):String(row.price);
+    const addBtn=area.querySelector('[data-need="add"][data-si="'+si+'"]');
+    addBtn.dataset.editing=ri;
+    addBtn.textContent="Сохранить";
+    addBtn.scrollIntoView({block:"nearest",behavior:"smooth"});
+    area.querySelector('[data-need="name"][data-si="'+si+'"]').focus();
+  });
   area.querySelectorAll("[data-need='add']").forEach(b=>b.onclick=()=>{
     const si=+b.dataset.si;
     const nm=area.querySelector('[data-need="name"][data-si="'+si+'"]').value.trim();
@@ -459,7 +473,15 @@ function renderNeeds(){
     const qy=area.querySelector('[data-need="qty"][data-si="'+si+'"]').value.trim();
     const pr=area.querySelector('[data-need="price"][data-si="'+si+'"]').value.trim();
     if(!nm){alert("Укажите наименование позиции");return;}
-    state.needs[si].rows.push({name:nm,art:ar,qty:qy,price:pr});
+    const editIdx=b.dataset.editing;
+    if(editIdx!==undefined){
+      // режим редактирования – обновляем существующую строку
+      const r=state.needs[si].rows[+editIdx];
+      if(r){r.name=nm; r.art=ar; r.qty=qy; r.price=pr;}
+      delete b.dataset.editing; b.textContent="Добавить";
+    }else{
+      state.needs[si].rows.push({name:nm,art:ar,qty:qy,price:pr});
+    }
     save(); renderNeeds();
     area.querySelector('[data-need="name"][data-si="'+si+'"]').value="";
     area.querySelector('[data-need="art"][data-si="'+si+'"]').value="";
