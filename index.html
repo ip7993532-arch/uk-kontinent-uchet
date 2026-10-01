@@ -523,8 +523,18 @@ function renderNeeds(){
   });
   area.querySelectorAll("[data-need='word']").forEach(b=>b.onclick=()=>{
     const si=+b.dataset.si, slot=state.needs[si];
-    const rows=(slot.rows||[]).map(r=>[r.name,r.art||"",r.qty||"",(r.price===""||r.price==null)?(r.price||""):String(r.price)]);
-    if(!rows.length){alert("Слот пуст — сначала добавьте позиции.");return;}
+    const rowsData=slot.rows||[];
+    if(!rowsData.length){alert("Слот пуст — сначала добавьте позиции.");return;}
+    function toNum(v){const s=String(v==null?"":v).replace(/[^\d.,-]/g,"").replace(",",".");const n=parseFloat(s);return isFinite(n)?n:0;}
+    const rows=rowsData.map(r=>[r.name,r.art||"",r.qty||"",(r.price===""||r.price==null)?(r.price||""):String(r.price)]);
+    let total=0;
+    rowsData.forEach(r=>{total+=toNum(r.price)*toNum(r.qty);});
+    const table=wordTable("",["Позиция","Артикул","Кол-во","Цена, ₽"],rows);
+    const totalTxt=total.toFixed(2).replace(".",",");
+    const kit="<table class='t' style='margin-top:6px;width:100%;border-collapse:collapse'>"+
+      "<tr><td style='border:1px solid #000;padding:4px 6px;text-align:right'><b>ИТОГО:</b></td>"+
+      "<td style='border:1px solid #000;padding:4px 6px;text-align:right;width:90px'><b>"+totalTxt+" ₽</b></td></tr>"+
+      "</table>";
     const author=needAuthor(slot.name);
     const h="<div class='org'>Управляющая компания «КОНТИНЕНТ»</div>"+
       "<h2 style='text-align:center'>Потребности — "+esc(slot.name)+"</h2>"+
@@ -533,7 +543,7 @@ function renderNeeds(){
         "<tr><td style='border:none;padding:2px 6px'><b>Кому:</b> Шлеин П.С., руководитель</td></tr>"+
         "<tr><td style='border:none;padding:2px 6px'><b>От кого:</b> "+(author?esc(author):"_________________")+" ("+esc(slot.name)+")</td></tr>"+
       "</table><br>";
-    downloadDoc("potrebnosti_"+slug(slot.name)+"_"+today(), h+wordTable("",["Позиция","Артикул","Кол-во","Цена, ₽"],rows));
+    downloadDoc("potrebnosti_"+slug(slot.name)+"_"+today(), h+table+kit);
   });
 }
 function slug(s){return String(s||"").toLowerCase().replace(/[^a-zа-яё0-9]+/gi,"-").replace(/^-+|-+$/g,"")||"slot";}
