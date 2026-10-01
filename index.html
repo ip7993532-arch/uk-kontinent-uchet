@@ -431,8 +431,8 @@ async function ghWrite(blob){
       rm.engTasks.forEach(rt=>{
         if(rt&&rt.deleted)delTaskIds[rt.id]=1;
         const existing=out.engTasks.find(x=>x.id===rt.id);
-        if(existing){ // обновляем статус из облака
-          if(rt.done!==undefined)existing.done=rt.done;
+        if(existing){ // статус «выполнено» не сбрасывается (если на любом устройстве уже отмечено)
+          existing.done = existing.done || !!rt.done;
         }else if(!rt.deleted&&!delTaskIds[rt.id]){out.engTasks.push(rt);}
       });
     }
@@ -505,7 +505,7 @@ async function syncPull(){
   rc.engTasks=rc.engTasks.filter(t=>!delTaskIds[t.id]&&!t.deleted);
   state.engTasks=state.engTasks.filter(t=>!delTaskIds[t.id]&&!t.deleted);
   (state.engTasks||[]).forEach(lt=>{
-    if(!delTaskIds[lt.id]){const ex=rc.engTasks.find(x=>x.id===lt.id);if(!ex){rc.engTasks.push(lt);}else{if(lt.done!==undefined)ex.done=lt.done;}}
+    if(!delTaskIds[lt.id]){const ex=rc.engTasks.find(x=>x.id===lt.id);if(!ex){rc.engTasks.push(lt);}else{ex.done=ex.done||!!lt.done;}}
   });
   const hasLocal=state.workers.length||state.items.length||state.tx.length;
   const hasRemote=rc.workers.length||rc.items.length||rc.tx.length;
@@ -934,7 +934,7 @@ function ghWriteDirect(blob){
         rm.engTasks.forEach(rt=>{
           if(rt&&rt.deleted)delTaskIds[rt.id]=1;
           const existing=out.engTasks.find(x=>x.id===rt.id);
-          if(existing){if(rt.done!==undefined)existing.done=rt.done;}
+          if(existing){existing.done=existing.done||!!rt.done;}
           else if(!rt.deleted&&!delTaskIds[rt.id]){out.engTasks.push(rt);}
         });
       }
